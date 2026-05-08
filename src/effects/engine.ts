@@ -267,9 +267,9 @@ export class ParticleEngine {
 
       // 3-layer glow: outer (thick, low alpha) → mid → core (thin, high alpha)
       const layers = [
-        { width: 6, color: 0x4488ff, alpha: baseAlpha * 0.2 },
-        { width: 3, color: 0x88bbff, alpha: baseAlpha * 0.5 },
-        { width: 1, color: 0xffffff, alpha: baseAlpha * 1.0 },
+        { width: 8, color: 0x4488ff, alpha: baseAlpha * 0.35 },
+        { width: 4, color: 0x88bbff, alpha: baseAlpha * 0.65 },
+        { width: 1.5, color: 0xffffff, alpha: baseAlpha * 1.0 },
       ];
 
       for (const seg of bolt.segments) {
@@ -302,9 +302,9 @@ export class ParticleEngine {
       const firstSeg = bolt.segments[0];
       const lastSeg = bolt.segments[bolt.segments.length - 1];
       if (firstSeg && lastSeg) {
-        const glowAlpha = baseAlpha * 0.15;
-        g.circle(firstSeg.x1, firstSeg.y1, 15).fill({ color: 0x4488ff, alpha: glowAlpha });
-        g.circle(lastSeg.x2, lastSeg.y2, 15).fill({ color: 0x4488ff, alpha: glowAlpha });
+        const glowAlpha = baseAlpha * 0.25;
+        g.circle(firstSeg.x1, firstSeg.y1, 22).fill({ color: 0x4488ff, alpha: glowAlpha });
+        g.circle(lastSeg.x2, lastSeg.y2, 22).fill({ color: 0x4488ff, alpha: glowAlpha });
       }
     }
 
@@ -425,9 +425,9 @@ export class ParticleEngine {
       }
 
       // Layer 1: large heat glow
-      g.circle(p.x, p.y, p.size * 3).fill({ color: colorNum, alpha: alpha * 0.08 * p.alpha });
+      g.circle(p.x, p.y, p.size * 3.5).fill({ color: colorNum, alpha: alpha * 0.14 * p.alpha });
       // Layer 2: mid transition
-      g.circle(p.x, p.y, p.size * 1.5).fill({ color: colorNum, alpha: alpha * 0.25 * p.alpha });
+      g.circle(p.x, p.y, p.size * 1.8).fill({ color: colorNum, alpha: alpha * 0.35 * p.alpha });
       // Layer 3: bright core
       g.circle(p.x, p.y, p.size).fill({ color: colorNum, alpha: alpha * 0.8 * p.alpha });
     }
@@ -489,13 +489,13 @@ export class ParticleEngine {
           alpha = 0;
           color = colorNum;
         } else if (t < 0.5) {
-          alpha = 0.08 * breathe * ((t - 0.3) / 0.2);
+          alpha = 0.12 * breathe * ((t - 0.3) / 0.2);
           color = colorNum;
         } else if (t < 0.7) {
-          alpha = 0.06 * breathe;
+          alpha = 0.1 * breathe;
           color = colorNum;
         } else {
-          alpha = 0.04 * breathe * (1 - (t - 0.7) / 0.3);
+          alpha = 0.06 * breathe * (1 - (t - 0.7) / 0.3);
           color = secColorNum;
         }
         if (alpha > 0.001) {
@@ -653,7 +653,7 @@ export class ParticleEngine {
 
       // Trail
       if (p.trail && p.trail.length >= 2) {
-        const trailAlphas = [0.1, 0.25];
+        const trailAlphas = [0.2, 0.45];
         const trailCount = Math.min(2, p.trail.length);
         for (let i = 0; i < trailCount; i++) {
           const tp = p.trail[p.trail.length - trailCount + i];
@@ -662,11 +662,11 @@ export class ParticleEngine {
       }
 
       // Outer glow
-      g.circle(p.x, p.y, p.size * 2).fill({ color: pColor, alpha: a * 0.2 });
+      g.circle(p.x, p.y, p.size * 2.5).fill({ color: pColor, alpha: a * 0.3 });
       // Core
-      g.circle(p.x, p.y, p.size).fill({ color: pColor, alpha: a * 0.5 });
+      g.circle(p.x, p.y, p.size).fill({ color: pColor, alpha: a * 0.65 });
       // Bright center
-      g.circle(p.x, p.y, p.size * 0.35).fill({ color: 0xffffff, alpha: a * 0.7 });
+      g.circle(p.x, p.y, p.size * 0.35).fill({ color: 0xffffff, alpha: a * 0.85 });
     }
   }
 
@@ -797,7 +797,7 @@ export class ParticleEngine {
     // Hex grid pattern
     const hexSize = 14;
     const hexR = baseR + 16;
-    const hexPulse = 0.08 + Math.sin(time * 3) * 0.04;
+    const hexPulse = 0.14 + Math.sin(time * 3) * 0.06;
 
     for (let row = -4; row <= 4; row++) {
       for (let col = -4; col <= 4; col++) {
@@ -1074,9 +1074,9 @@ export class ParticleEngine {
       const flicker = 0.5 + 0.5 * Math.sin(this.time * (p.flickerSpeed ?? 4) + (p.flickerPhase ?? 0));
       const a = lifeRatio * p.alpha * flicker;
       const pColor = hexToNum(p.color);
-      g.circle(p.x, p.y, p.size * 2).fill({ color: pColor, alpha: a * 0.15 });
-      g.circle(p.x, p.y, p.size).fill({ color: pColor, alpha: a * 0.7 });
-      g.circle(p.x, p.y, p.size * 0.3).fill({ color: 0xffffff, alpha: a * 0.8 });
+      g.circle(p.x, p.y, p.size * 2.5).fill({ color: pColor, alpha: a * 0.22 });
+      g.circle(p.x, p.y, p.size).fill({ color: pColor, alpha: a * 0.8 });
+      g.circle(p.x, p.y, p.size * 0.3).fill({ color: 0xffffff, alpha: a * 0.95 });
     }
   }
 
@@ -1148,9 +1148,9 @@ export class ParticleEngine {
         g.lineTo(points[i].x, points[i].y);
       }
       g.closePath();
-      g.fill({ color: pColor, alpha: a * 0.7 });
+      g.fill({ color: pColor, alpha: a * 0.8 });
       // Soft glow
-      g.circle(p.x, p.y, p.size * 1.5).fill({ color: pColor, alpha: a * 0.1 });
+      g.circle(p.x, p.y, p.size * 2).fill({ color: pColor, alpha: a * 0.18 });
     }
   }
 
@@ -1250,11 +1250,11 @@ export class ParticleEngine {
       const pColor = hexToNum(p.color);
 
       // Outer glow
-      g.circle(p.x, p.y, p.size * 3).fill({ color: pColor, alpha: a * 0.08 });
+      g.circle(p.x, p.y, p.size * 3.5).fill({ color: pColor, alpha: a * 0.15 });
       // Core
-      g.circle(p.x, p.y, p.size).fill({ color: pColor, alpha: a * 0.7 });
+      g.circle(p.x, p.y, p.size).fill({ color: pColor, alpha: a * 0.8 });
       // Bright center
-      g.circle(p.x, p.y, p.size * 0.3).fill({ color: 0xffffff, alpha: a * 0.9 });
+      g.circle(p.x, p.y, p.size * 0.3).fill({ color: 0xffffff, alpha: a * 1.0 });
     }
 
     // Meteors
@@ -1335,7 +1335,7 @@ export class ParticleEngine {
       const y1 = cy + Math.sin(baseAngle) * innerR;
       const x2 = cx + Math.cos(baseAngle) * (innerR + rayLen);
       const y2 = cy + Math.sin(baseAngle) * (innerR + rayLen);
-      const alpha = 0.15 + Math.sin(time * 3 + i * 0.8) * 0.1;
+      const alpha = 0.25 + Math.sin(time * 3 + i * 0.8) * 0.15;
 
       g.moveTo(x1, y1);
       g.lineTo(x2, y2);
@@ -1343,7 +1343,7 @@ export class ParticleEngine {
 
       // Glow around ray
       const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
-      g.circle(mx, my, 6).fill({ color: rainbowColors[i], alpha: alpha * 0.15 });
+      g.circle(mx, my, 8).fill({ color: rainbowColors[i], alpha: alpha * 0.25 });
     }
 
     // Prismatic halo
@@ -1492,11 +1492,11 @@ export class ParticleEngine {
       }
 
       // Outer glow
-      g.circle(p.x, p.y, p.size * 2).fill({ color: pColor, alpha: a * 0.12 });
+      g.circle(p.x, p.y, p.size * 2.5).fill({ color: pColor, alpha: a * 0.2 });
       // Core
-      g.circle(p.x, p.y, p.size).fill({ color: pColor, alpha: a * 0.7 });
+      g.circle(p.x, p.y, p.size).fill({ color: pColor, alpha: a * 0.8 });
       // Bright center
-      g.circle(p.x, p.y, p.size * 0.3).fill({ color: 0xffffff, alpha: a * 0.5 });
+      g.circle(p.x, p.y, p.size * 0.3).fill({ color: 0xffffff, alpha: a * 0.7 });
     }
   }
 
@@ -1598,11 +1598,11 @@ export class ParticleEngine {
         }
 
         // Glow
-        g.circle(p.x, p.y, p.size * 2).fill({ color: pColor, alpha: a * 0.15 });
+        g.circle(p.x, p.y, p.size * 2.5).fill({ color: pColor, alpha: a * 0.25 });
         // Core
-        g.circle(p.x, p.y, p.size).fill({ color: pColor, alpha: a * 0.8 });
+        g.circle(p.x, p.y, p.size).fill({ color: pColor, alpha: a * 0.9 });
         // Spark center
-        g.circle(p.x, p.y, p.size * 0.3).fill({ color: 0xffffff, alpha: a * 0.6 });
+        g.circle(p.x, p.y, p.size * 0.3).fill({ color: 0xffffff, alpha: a * 0.8 });
       }
     }
   }
@@ -1663,11 +1663,11 @@ export class ParticleEngine {
       const pColor = hexToNum(p.color);
 
       // Outer glow
-      g.circle(p.x, p.y, p.size * 3).fill({ color: pColor, alpha: a * 0.08 });
+      g.circle(p.x, p.y, p.size * 3.5).fill({ color: pColor, alpha: a * 0.14 });
       // Core
-      g.circle(p.x, p.y, p.size).fill({ color: pColor, alpha: a * 0.7 });
+      g.circle(p.x, p.y, p.size).fill({ color: pColor, alpha: a * 0.8 });
       // Bright center
-      g.circle(p.x, p.y, p.size * 0.3).fill({ color: 0xffffff, alpha: a * 0.8 });
+      g.circle(p.x, p.y, p.size * 0.3).fill({ color: 0xffffff, alpha: a * 0.95 });
     }
   }
 
