@@ -195,7 +195,7 @@ export class ParticleEngine {
   }
 
   // ════════════════════════════════════════════════════════════════════
-  // �?LIGHTNING
+  // �?LIGHTNING
   // ════════════════════════════════════════════════════════════════════
 
   private generateBolt(
@@ -318,7 +318,7 @@ export class ParticleEngine {
       const flashAlpha = progress > 0.7 ? 1 : 0.6 + Math.sin(progress * Math.PI * 8) * 0.4;
       const baseAlpha = fadeAlpha * flashAlpha * bolt.glow;
 
-      // 3-layer glow: outer (thick, low alpha) �?mid �?core (thin, high alpha)
+      // 3-layer glow: outer (thick, low alpha) �?mid �?core (thin, high alpha)
       const layers = [
         { width: 4, color: 0x4488ff, alpha: baseAlpha * 0.35 },
         { width: 2, color: 0x88bbff, alpha: baseAlpha * 0.65 },
@@ -488,7 +488,7 @@ export class ParticleEngine {
   }
 
   // ════════════════════════════════════════════════════════════════════
-  // �?GLOW
+  // �?GLOW
   // ════════════════════════════════════════════════════════════════════
 
   private updateGlow(cw: number, ch: number, sz: number) {
@@ -1214,7 +1214,7 @@ export class ParticleEngine {
   }
 
   // ════════════════════════════════════════════════════════════════════
-  // �?STARDUST
+  // �?STARDUST
   // ════════════════════════════════════════════════════════════════════
 
   private updateStardust(cw: number, ch: number, sz: number) {
@@ -1441,7 +1441,7 @@ export class ParticleEngine {
   }
 
   // ════════════════════════════════════════════════════════════════════
-  // 🌪�?VORTEX
+  // 🌪�?VORTEX
   // ════════════════════════════════════════════════════════════════════
 
   private updateVortex(cw: number, ch: number, sz: number) {
@@ -1667,7 +1667,7 @@ export class ParticleEngine {
   }
 
   // ════════════════════════════════════════════════════════════════════
-  // �?GOLD
+  // �?GOLD
   // ════════════════════════════════════════════════════════════════════
 
   private updateGold(cw: number, ch: number, _sz: number) {
@@ -1803,7 +1803,7 @@ export class ParticleEngine {
   }
 
   // ════════════════════════════════════════════════════════════════════
-  // �?LOADER
+  // �?LOADER
   // ════════════════════════════════════════════════════════════════════
 
   private updateLoader(cw: number, ch: number, sz: number) {
