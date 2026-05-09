@@ -1,4 +1,5 @@
 import * as PIXI from 'pixi.js';
+import { SQUARE_CORNER_RADIUS } from './types';
 import type { Particle, EffectParams, EffectType, CropShape } from './types';
 
 // ─── Color utilities ───
@@ -22,6 +23,13 @@ function lerpColor(a: string, b: string, t: number): number {
   const g = Math.round(g1 + (g2 - g1) * t);
   const bv = Math.round(b1 + (b2 - b1) * t);
   return (r << 16) | (g << 8) | bv;
+}
+
+function getInsetRoundRectMetrics(half: number, lineWidth: number) {
+  const inset = Math.max(lineWidth / 2 + 1, 2);
+  const innerHalf = Math.max(half - inset, 0);
+  const cornerRadius = Math.max(Math.min(SQUARE_CORNER_RADIUS - inset, innerHalf), 0);
+  return { innerHalf, cornerRadius };
 }
 
 export class ParticleEngine {
@@ -2232,7 +2240,7 @@ export class ParticleEngine {
     const cx = cw / 2, cy = ch / 2;
     const r = sz / 2;
     const lineWidth = 4 + (this.params.intensity / 100) * 36;
-    const steps = 1440;
+    const steps = 1920;
     const time = this.solidRingAngle;
 
     // Vivid gradient: red → orange → green → blue
@@ -2247,8 +2255,7 @@ export class ParticleEngine {
     const ringR = r - lineWidth / 2;
 
     if (this.shape === 'square') {
-      const cornerRadius = 16;
-      const half = ringR;
+      const { innerHalf, cornerRadius } = getInsetRoundRectMetrics(ringR, lineWidth);
       for (let i = 0; i < steps; i++) {
         const t = i / steps;
         const colorT = (t + time * 0.3) % 1;
@@ -2260,11 +2267,11 @@ export class ParticleEngine {
           rainbowColors[Math.min(ci + 1, rainbowColors.length - 1)],
           cf
         );
-        const p1 = this.getRoundRectPoint(cx, cy, half, cornerRadius, t);
-        const p2 = this.getRoundRectPoint(cx, cy, half, cornerRadius, (i + 1) / steps);
+        const p1 = this.getRoundRectPoint(cx, cy, innerHalf, cornerRadius, t);
+        const p2 = this.getRoundRectPoint(cx, cy, innerHalf, cornerRadius, (i + 1) / steps);
         g.moveTo(p1.x, p1.y);
         g.lineTo(p2.x, p2.y);
-        g.stroke({ width: lineWidth, color: segColor, alpha: 1 });
+        g.stroke({ width: lineWidth, color: segColor, alpha: 1, cap: 'round', join: 'round' });
       }
       return;
     }
@@ -2307,11 +2314,10 @@ export class ParticleEngine {
     const discColors = [
       '#ff0040', '#ff8000', '#ffe000', '#00ff80', '#00b0ff', '#a040ff', '#ff0040',
     ];
-    const steps = 1440;
+    const steps = 1920;
 
     if (this.shape === 'square') {
-      const cornerRadius = 16;
-      const half = ringR;
+      const { innerHalf, cornerRadius } = getInsetRoundRectMetrics(ringR, ringWidth);
       for (let i = 0; i < steps; i++) {
         const t = i / steps;
         const colorT = ((t + this.discAngle / (Math.PI * 2)) % 1) * (discColors.length - 1);
@@ -2322,11 +2328,11 @@ export class ParticleEngine {
           discColors[Math.min(ci + 1, discColors.length - 1)],
           cf,
         );
-        const p1 = this.getRoundRectPoint(cx, cy, half, cornerRadius, t);
-        const p2 = this.getRoundRectPoint(cx, cy, half, cornerRadius, (i + 1) / steps);
+        const p1 = this.getRoundRectPoint(cx, cy, innerHalf, cornerRadius, t);
+        const p2 = this.getRoundRectPoint(cx, cy, innerHalf, cornerRadius, (i + 1) / steps);
         g.moveTo(p1.x, p1.y);
         g.lineTo(p2.x, p2.y);
-        g.stroke({ width: ringWidth, color: segColor, alpha: 1 });
+        g.stroke({ width: ringWidth, color: segColor, alpha: 1, cap: 'round', join: 'round' });
       }
     } else {
       for (let i = 0; i < steps; i++) {

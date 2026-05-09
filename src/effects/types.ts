@@ -2,6 +2,7 @@ import type { Application, Container, Graphics } from 'pixi.js';
 
 export type EffectType = 'lightning' | 'fire' | 'glow' | 'orbit' | 'shield' | 'frost' | 'ripple' | 'petal' | 'stardust' | 'prism' | 'vortex' | 'firework' | 'gold' | 'spin' | 'loader' | 'matrix' | 'bubble' | 'aurora' | 'firefly' | 'rain' | 'solidring' | 'disc';
 export type CropShape = 'circle' | 'square';
+export const SQUARE_CORNER_RADIUS = 16;
 
 export interface TrailPoint {
   x: number;

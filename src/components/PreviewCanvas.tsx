@@ -1,6 +1,7 @@
 import React, { useRef, useEffect } from 'react';
 import * as PIXI from 'pixi.js';
 import { ParticleEngine } from '../effects/engine';
+import { SQUARE_CORNER_RADIUS } from '../effects/types';
 import type { EffectType, CropShape, EffectParams } from '../effects/types';
 import type { GifData } from '../lib/gif-decoder';
 
@@ -144,7 +145,7 @@ const PreviewCanvas: React.FC<Props> = ({ image, gifData, effect, shape, params,
         if (shape === 'circle') {
           mask.circle(SIZE / 2, SIZE / 2, SIZE / 2).fill({ color: 0xffffff });
         } else {
-          mask.roundRect(0, 0, SIZE, SIZE, 16).fill({ color: 0xffffff });
+          mask.roundRect(0, 0, SIZE, SIZE, SQUARE_CORNER_RADIUS).fill({ color: 0xffffff });
         }
         app.stage.addChild(mask);
         maskRef.current = mask;
