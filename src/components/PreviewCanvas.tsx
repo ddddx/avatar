@@ -9,11 +9,12 @@ interface Props {
   shape: CropShape;
   params: EffectParams;
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
+  noImageMode?: boolean;
 }
 
 const SIZE = 512;
 
-const PreviewCanvas: React.FC<Props> = ({ image, effect, shape, params, canvasRef }) => {
+const PreviewCanvas: React.FC<Props> = ({ image, effect, shape, params, canvasRef, noImageMode }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const appRef = useRef<PIXI.Application | null>(null);
   const engineRef = useRef(new ParticleEngine());
@@ -36,10 +37,11 @@ const PreviewCanvas: React.FC<Props> = ({ image, effect, shape, params, canvasRe
         await app.init({
           width: SIZE,
           height: SIZE,
-          background: 0x0a0a0f,
+          background: noImageMode ? 0x00000000 : 0x0a0a0f,
           antialias: true,
           resolution: 1,
           preserveDrawingBuffer: true,
+          backgroundAlpha: noImageMode ? 0 : 1,
         });
         if (destroyed) { app.destroy(true); return; }
         appRef.current = app;
@@ -85,36 +87,39 @@ const PreviewCanvas: React.FC<Props> = ({ image, effect, shape, params, canvasRe
 
       cancelAnimationFrame(rafRef.current);
 
-      // If no image, just show empty canvas
-      if (!image) return;
+      // No-image mode: just effects on transparent background
+      if (!image && !noImageMode) return;
 
-      // imgSize = the avatar area (effects draw along its edge)
+      const hasImage = !!image;
       const imgSize = SIZE;
-      const texture = PIXI.Texture.from(image);
-      const sprite = new PIXI.Sprite(texture);
-      sprite.anchor.set(0.5);
-      sprite.position.set(SIZE / 2, SIZE / 2);
-      const scale = Math.max(imgSize / image.width, imgSize / image.height);
-      sprite.scale.set(scale);
 
-      // Create mask — inscribed circle or full rectangle
-      const mask = new PIXI.Graphics();
-      if (shape === 'circle') {
-        mask.circle(SIZE / 2, SIZE / 2, SIZE / 2).fill({ color: 0xffffff });
-      } else {
-        mask.rect(0, 0, SIZE, SIZE).fill({ color: 0xffffff });
+      if (hasImage) {
+        const texture = PIXI.Texture.from(image!);
+        const sprite = new PIXI.Sprite(texture);
+        sprite.anchor.set(0.5);
+        sprite.position.set(SIZE / 2, SIZE / 2);
+        const scale = Math.max(imgSize / image!.width, imgSize / image!.height);
+        sprite.scale.set(scale);
+
+        // Create mask — inscribed circle or full rectangle
+        const mask = new PIXI.Graphics();
+        if (shape === 'circle') {
+          mask.circle(SIZE / 2, SIZE / 2, SIZE / 2).fill({ color: 0xffffff });
+        } else {
+          mask.rect(0, 0, SIZE, SIZE).fill({ color: 0xffffff });
+        }
+        app.stage.addChild(mask);
+        maskRef.current = mask;
+
+        sprite.mask = mask;
+        app.stage.addChild(sprite);
+        imageSpriteRef.current = sprite;
       }
-      app.stage.addChild(mask);
-      maskRef.current = mask;
-
-      sprite.mask = mask;
-      app.stage.addChild(sprite);
-      imageSpriteRef.current = sprite;
 
       // Create glow layer (blurred, underneath) — soft light halo
       const glowGfx = new PIXI.Graphics();
       glowGfx.blendMode = 'add';
-      glowGfx.mask = mask;
+      if (maskRef.current) glowGfx.mask = maskRef.current;
       const blurFilter = new PIXI.BlurFilter({ strength: 8, quality: 3 });
       glowGfx.filters = [blurFilter];
       app.stage.addChild(glowGfx);
@@ -123,7 +128,7 @@ const PreviewCanvas: React.FC<Props> = ({ image, effect, shape, params, canvasRe
       // Create sharp effects layer (on top) — bright cores
       const effectsGfx = new PIXI.Graphics();
       effectsGfx.blendMode = 'add';
-      effectsGfx.mask = mask;
+      if (maskRef.current) effectsGfx.mask = maskRef.current;
       app.stage.addChild(effectsGfx);
       effectsGfxRef.current = effectsGfx;
 
@@ -158,7 +163,7 @@ const PreviewCanvas: React.FC<Props> = ({ image, effect, shape, params, canvasRe
       }
       initRef.current = false;
     };
-  }, [image, effect, shape, canvasRef]);
+  }, [image, effect, shape, canvasRef, noImageMode]);
 
   // Live-update params (speed, density, intensity, colors) without restarting animation
   useEffect(() => {

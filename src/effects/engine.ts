@@ -80,6 +80,23 @@ export class ParticleEngine {
   // Gold state
   private goldTime = 0;
 
+  // Spin state
+  private spinTime = 0;
+
+  // Loader state
+  private loaderTime = 0;
+
+  // Matrix state
+  private matrixColumns: Array<{ x: number; chars: string[]; speed: number; phase: number }> = [];
+  private matrixTimer = 0;
+
+  // Bubble state
+  private bubbleTime = 0;
+
+  // Pulse state
+  private pulseRings: Array<{ radius: number; alpha: number; speed: number }> = [];
+  private pulseTimer = 0;
+
   setEffect(e: EffectType) { this.effect = e; this.particles = []; this.lightningBolts = []; }
   setShape(s: CropShape) { this.shape = s; }
   setParams(p: EffectParams) { this.params = p; }
@@ -102,6 +119,11 @@ export class ParticleEngine {
       case 'vortex':    this.updateVortex(canvasW, canvasH, imgSize); break;
       case 'firework':  this.updateFirework(canvasW, canvasH, imgSize); break;
       case 'gold':      this.updateGold(canvasW, canvasH, imgSize); break;
+      case 'spin':      this.updateSpin(canvasW, canvasH, imgSize); break;
+      case 'loader':    this.updateLoader(canvasW, canvasH, imgSize); break;
+      case 'matrix':    this.updateMatrix(canvasW, canvasH, imgSize); break;
+      case 'bubble':    this.updateBubble(canvasW, canvasH, imgSize); break;
+      case 'pulse':     this.updatePulse(canvasW, canvasH, imgSize); break;
     }
   }
 
@@ -121,6 +143,11 @@ export class ParticleEngine {
       case 'vortex':    this.drawVortex(g, canvasW, canvasH, imgSize); break;
       case 'firework':  this.drawFirework(g, canvasW, canvasH, imgSize); break;
       case 'gold':      this.drawGold(g, canvasW, canvasH, imgSize); break;
+      case 'spin':      this.drawSpin(g, canvasW, canvasH, imgSize); break;
+      case 'loader':    this.drawLoader(g, canvasW, canvasH, imgSize); break;
+      case 'matrix':    this.drawMatrix(g, canvasW, canvasH, imgSize); break;
+      case 'bubble':    this.drawBubble(g, canvasW, canvasH, imgSize); break;
+      case 'pulse':     this.drawPulse(g, canvasW, canvasH, imgSize); break;
     }
   }
 
@@ -1681,6 +1708,319 @@ export class ParticleEngine {
     }
   }
 
+  // ════════════════════════════════════════════════════════════════════
+  // 🔄 SPIN
+  // ════════════════════════════════════════════════════════════════════
+
+  private updateSpin(cw: number, ch: number, sz: number) {
+    this.spinTime += 0.016 * (this.params.speed / 50);
+    const cx = cw / 2, cy = ch / 2;
+    const ringCount = 2 + Math.floor(this.params.intensity / 30);
+    const targetCount = Math.floor(this.params.density * 3) + 40;
+
+    while (this.particles.length < targetCount) {
+      const ring = Math.floor(Math.random() * ringCount);
+      const baseRadius = sz * 0.15 + (ring / ringCount) * sz * 0.4;
+      const angle = Math.random() * Math.PI * 2;
+      this.particles.push({
+        x: cx + Math.cos(angle) * baseRadius,
+        y: cy + Math.sin(angle) * baseRadius,
+        vx: 0, vy: 0,
+        life: 300 + Math.random() * 400,
+        maxLife: 700,
+        size: 1.5 + Math.random() * 2,
+        color: Math.random() > 0.4 ? this.params.color : this.params.secondaryColor,
+        alpha: 0.5 + Math.random() * 0.5,
+        angle: angle,
+        radius: baseRadius,
+        angularSpeed: (0.02 + Math.random() * 0.03) * (ring % 2 === 0 ? 1 : -1),
+        orbitLayer: ring,
+        trail: [],
+      });
+    }
+
+    this.particles = this.particles.filter(p => {
+      const oldX = p.x, oldY = p.y;
+      p.angle = (p.angle ?? 0) + (p.angularSpeed ?? 0.02);
+      // Slight radius oscillation
+      const wobble = Math.sin(this.spinTime * 2 + (p.orbitLayer ?? 0)) * sz * 0.02;
+      p.x = cx + Math.cos(p.angle ?? 0) * ((p.radius ?? 0) + wobble);
+      p.y = cy + Math.sin(p.angle ?? 0) * ((p.radius ?? 0) + wobble);
+      if (p.trail) {
+        p.trail.push({ x: oldX, y: oldY, alpha: p.alpha, size: p.size });
+        if (p.trail.length > 8) p.trail.shift();
+      }
+      p.life -= 1;
+      return p.life > 0;
+    });
+  }
+
+  private drawSpin(g: PIXI.Graphics, cw: number, ch: number, sz: number) {
+    const cx = cw / 2, cy = ch / 2, r = sz / 2;
+    // Center glow
+    const glowA = 0.04 + Math.sin(this.spinTime * 3) * 0.02;
+    g.circle(cx, cy, r * 0.15).fill({ color: hexToNum(this.params.color), alpha: glowA });
+
+    for (const p of this.particles) {
+      const lifeRatio = p.life / p.maxLife;
+      const a = lifeRatio * p.alpha;
+      const pColor = hexToNum(p.color);
+      // Trail
+      if (p.trail) {
+        for (let i = 0; i < p.trail.length; i++) {
+          const t = p.trail[i];
+          const ta = a * (i / p.trail.length) * 0.3;
+          g.circle(t.x, t.y, t.size * 0.6).fill({ color: pColor, alpha: ta });
+        }
+      }
+      // Glow + core
+      g.circle(p.x, p.y, p.size * 2.5).fill({ color: pColor, alpha: a * 0.15 });
+      g.circle(p.x, p.y, p.size).fill({ color: pColor, alpha: a * 0.8 });
+      g.circle(p.x, p.y, p.size * 0.4).fill({ color: 0xffffff, alpha: a * 0.6 });
+    }
+  }
+
+  // ════════════════════════════════════════════════════════════════════
+  // ⏳ LOADER
+  // ════════════════════════════════════════════════════════════════════
+
+  private updateLoader(cw: number, ch: number, sz: number) {
+    this.loaderTime += 0.016 * (this.params.speed / 50);
+    const cx = cw / 2, cy = ch / 2;
+    const dotCount = 3 + Math.floor(this.params.intensity / 25);
+    const orbitR = sz * 0.25;
+    const targetCount = dotCount * 6; // dots + trails
+
+    while (this.particles.length < targetCount) {
+      const idx = this.particles.length % dotCount;
+      const angle = (idx / dotCount) * Math.PI * 2;
+      this.particles.push({
+        x: cx + Math.cos(angle) * orbitR,
+        y: cy + Math.sin(angle) * orbitR,
+        vx: 0, vy: 0,
+        life: 99999,
+        maxLife: 99999,
+        size: 3 + Math.random() * 2,
+        color: idx === 0 ? this.params.color : this.params.secondaryColor,
+        alpha: 0.9,
+        angle: angle,
+        radius: orbitR,
+        orbitLayer: idx,
+      });
+    }
+
+    // Loader dots orbit and pulse
+    const mainAngle = this.loaderTime * 3;
+    this.particles.forEach((p, i) => {
+      const idx = p.orbitLayer ?? 0;
+      const phase = mainAngle - (idx / dotCount) * Math.PI * 0.5;
+      // Ease in/out for each dot
+      const eased = phase + Math.sin(phase * 2) * 0.3;
+      p.x = cx + Math.cos(eased) * (p.radius ?? 0);
+      p.y = cy + Math.sin(eased) * (p.radius ?? 0);
+      // Pulse size
+      const pulse = 0.7 + 0.3 * Math.sin(this.loaderTime * 8 + idx);
+      p.size = (3 + Math.sin(idx) * 1.5) * pulse;
+      // Stagger fade
+      const fadePhase = (this.loaderTime * 2 + idx * 0.5) % 1;
+      p.alpha = 0.4 + 0.6 * Math.abs(Math.sin(fadePhase * Math.PI));
+    });
+  }
+
+  private drawLoader(g: PIXI.Graphics, cw: number, ch: number, sz: number) {
+    const cx = cw / 2, cy = ch / 2;
+    const colorNum = hexToNum(this.params.color);
+    const secColorNum = hexToNum(this.params.secondaryColor);
+
+    // Center pulsing circle
+    const breathe = 0.06 + 0.04 * Math.sin(this.loaderTime * 4);
+    g.circle(cx, cy, sz * 0.08).fill({ color: colorNum, alpha: breathe });
+
+    // Orbiting dots
+    for (const p of this.particles) {
+      const pColor = hexToNum(p.color);
+      // Glow
+      g.circle(p.x, p.y, p.size * 3).fill({ color: pColor, alpha: p.alpha * 0.12 });
+      // Core
+      g.circle(p.x, p.y, p.size).fill({ color: pColor, alpha: p.alpha });
+      // Bright center
+      g.circle(p.x, p.y, p.size * 0.4).fill({ color: 0xffffff, alpha: p.alpha * 0.7 });
+    }
+
+    // Orbit path hint
+    g.circle(cx, cy, sz * 0.25).stroke({ color: colorNum, alpha: 0.08, width: 1 });
+  }
+
+  // ════════════════════════════════════════════════════════════════════
+  // 🟢 MATRIX
+  // ════════════════════════════════════════════════════════════════════
+
+  private updateMatrix(cw: number, ch: number, sz: number) {
+    this.matrixTimer += 0.016 * (this.params.speed / 50);
+    const colWidth = 12;
+    const colCount = Math.floor(sz / colWidth);
+    const cx = cw / 2, startX = cx - sz / 2;
+
+    // Initialize columns
+    if (this.matrixColumns.length === 0) {
+      for (let i = 0; i < colCount; i++) {
+        const charCount = 5 + Math.floor(Math.random() * 15);
+        const chars = Array.from({ length: charCount }, () =>
+          String.fromCharCode(0x30A0 + Math.floor(Math.random() * 96))
+        );
+        this.matrixColumns.push({
+          x: startX + i * colWidth + colWidth / 2,
+          chars,
+          speed: 0.5 + Math.random() * 1.5,
+          phase: Math.random() * 100,
+        });
+      }
+    }
+
+    // Update columns
+    this.matrixColumns.forEach(col => {
+      col.phase += col.speed * 0.016 * (this.params.speed / 50);
+    });
+  }
+
+  private drawMatrix(g: PIXI.Graphics, cw: number, ch: number, sz: number) {
+    const cy = ch / 2;
+    const topY = cy - sz / 2;
+    const bottomY = cy + sz / 2;
+    const charH = 14;
+    const greenNum = hexToNum(this.params.color);
+    const darkGreenNum = hexToNum(this.params.secondaryColor);
+
+    // Background tint
+    g.rect(cw / 2 - sz / 2, topY, sz, sz).fill({ color: 0x000000, alpha: 0.3 });
+
+    for (const col of this.matrixColumns) {
+      const visibleChars = Math.floor(sz / charH);
+      for (let i = 0; i < Math.min(col.chars.length, visibleChars); i++) {
+        const y = topY + ((col.phase + i * charH) % sz);
+        if (y < topY || y > bottomY) continue;
+        const isHead = i === 0;
+        const fadeT = i / visibleChars;
+        const alpha = isHead ? 1 : Math.max(0, 0.8 - fadeT * 0.7);
+        const color = isHead ? 0xffffff : (fadeT < 0.3 ? greenNum : darkGreenNum);
+        // Use a simple rect as placeholder for character
+        g.rect(col.x - 3, y - 5, 6, 10).fill({ color, alpha: alpha * 0.8 });
+        // Glow on head
+        if (isHead) {
+          g.circle(col.x, y, 6).fill({ color: greenNum, alpha: 0.3 });
+        }
+      }
+    }
+  }
+
+  // ════════════════════════════════════════════════════════════════════
+  // 🫧 BUBBLE
+  // ════════════════════════════════════════════════════════════════════
+
+  private updateBubble(cw: number, ch: number, sz: number) {
+    this.bubbleTime += 0.016 * (this.params.speed / 50);
+    const cx = cw / 2, cy = ch / 2, r = sz / 2;
+    const targetCount = Math.floor(this.params.density * 1.5) + 20;
+
+    while (this.particles.length < targetCount) {
+      this.particles.push({
+        x: cx + (Math.random() - 0.5) * sz * 0.8,
+        y: cy + r * 0.8 + Math.random() * r * 0.2,
+        vx: 0, vy: 0,
+        life: 200 + Math.random() * 300,
+        maxLife: 500,
+        size: 3 + Math.random() * 6,
+        color: Math.random() > 0.5 ? this.params.color : this.params.secondaryColor,
+        alpha: 0.3 + Math.random() * 0.4,
+        swayPhase: Math.random() * Math.PI * 2,
+        swaySpeed: 1 + Math.random() * 2,
+      });
+    }
+
+    this.particles = this.particles.filter(p => {
+      // Rise
+      p.y -= 0.5 + Math.random() * 0.3;
+      // Sway
+      p.x += Math.sin(this.bubbleTime * (p.swaySpeed ?? 1) + (p.swayPhase ?? 0)) * 0.5;
+      // Slight shrink as it rises
+      const lifeRatio = p.life / p.maxLife;
+      p.size *= 0.9995;
+      p.life -= 1;
+      // Pop near top
+      return p.life > 0 && p.y > cy - r * 0.9;
+    });
+  }
+
+  private drawBubble(g: PIXI.Graphics, cw: number, ch: number, sz: number) {
+    const cx = cw / 2, cy = ch / 2, r = sz / 2;
+
+    for (const p of this.particles) {
+      const lifeRatio = p.life / p.maxLife;
+      const a = p.alpha * Math.min(1, lifeRatio * 3);
+      const pColor = hexToNum(p.color);
+
+      // Bubble rim
+      g.circle(p.x, p.y, p.size).stroke({ color: pColor, alpha: a * 0.7, width: 1.5 });
+      // Inner glow
+      g.circle(p.x, p.y, p.size * 0.7).fill({ color: pColor, alpha: a * 0.1 });
+      // Highlight
+      g.circle(p.x - p.size * 0.25, p.y - p.size * 0.25, p.size * 0.25).fill({ color: 0xffffff, alpha: a * 0.5 });
+    }
+  }
+
+  // ════════════════════════════════════════════════════════════════════
+  // 📡 PULSE
+  // ════════════════════════════════════════════════════════════════════
+
+  private updatePulse(cw: number, ch: number, sz: number) {
+    this.pulseTimer += 0.016 * (this.params.speed / 50);
+    const cx = cw / 2, cy = ch / 2;
+
+    // Spawn new rings periodically
+    const spawnInterval = 40 / (this.params.speed / 50);
+    if (Math.floor(this.pulseTimer * 60) % Math.floor(spawnInterval) === 0 && this.pulseRings.length < 8) {
+      this.pulseRings.push({
+        radius: sz * 0.05,
+        alpha: 0.8,
+        speed: 1 + (this.params.intensity / 100) * 2,
+      });
+    }
+
+    this.pulseRings = this.pulseRings.filter(ring => {
+      ring.radius += ring.speed;
+      ring.alpha -= 0.008;
+      return ring.alpha > 0 && ring.radius < sz * 0.6;
+    });
+  }
+
+  private drawPulse(g: PIXI.Graphics, cw: number, ch: number, sz: number) {
+    const cx = cw / 2, cy = ch / 2;
+    const colorNum = hexToNum(this.params.color);
+    const secColorNum = hexToNum(this.params.secondaryColor);
+
+    // Center dot
+    g.circle(cx, cy, 4).fill({ color: colorNum, alpha: 0.8 });
+    g.circle(cx, cy, 8).fill({ color: colorNum, alpha: 0.15 });
+
+    // Rings
+    for (const ring of this.pulseRings) {
+      const t = ring.radius / (sz * 0.6);
+      const color = lerpColor(this.params.color, this.params.secondaryColor, t);
+      g.circle(cx, cy, ring.radius).stroke({
+        color,
+        alpha: ring.alpha,
+        width: 2 + (1 - t) * 2,
+      });
+    }
+
+    // Radar sweep line
+    const sweepAngle = this.pulseTimer * 3;
+    const sweepLen = sz * 0.45;
+    g.moveTo(cx, cy)
+      .lineTo(cx + Math.cos(sweepAngle) * sweepLen, cy + Math.sin(sweepAngle) * sweepLen)
+      .stroke({ color: colorNum, alpha: 0.3, width: 1.5 });
+  }
+
   clear() {
     this.particles = [];
     this.lightningBolts = [];
@@ -1701,5 +2041,12 @@ export class ParticleEngine {
     this.fireworkBursts = [];
     this.fireworkTimer = 0;
     this.goldTime = 0;
+    this.spinTime = 0;
+    this.loaderTime = 0;
+    this.matrixColumns = [];
+    this.matrixTimer = 0;
+    this.bubbleTime = 0;
+    this.pulseRings = [];
+    this.pulseTimer = 0;
   }
 }

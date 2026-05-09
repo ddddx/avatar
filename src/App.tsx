@@ -13,6 +13,7 @@ const supportsWebWorkers = typeof Worker !== 'undefined';
 
 function App() {
   const [image, setImage] = useState<HTMLImageElement | null>(null);
+  const [noImageMode, setNoImageMode] = useState(false);
   const [effect, setEffect] = useState<EffectType>('lightning');
   const [shape, setShape] = useState<CropShape>('circle');
   const [params, setParams] = useState<EffectParams>({ ...DEFAULT_PARAMS });
@@ -201,7 +202,18 @@ function App() {
         <div className="sidebar">
           <section className="panel">
             <h2 className="panel-title">📷 上传头像</h2>
-            <ImageUploader onImageLoad={setImage} />
+            <div className="no-image-toggle">
+              <button
+                className={`shape-btn ${noImageMode ? 'active' : ''}`}
+                onClick={() => {
+                  setNoImageMode(!noImageMode);
+                  if (!noImageMode) setImage(null);
+                }}
+              >
+                {noImageMode ? '✅ 无图片模式' : '🖼️ 无图片模式'}
+              </button>
+            </div>
+            {!noImageMode && <ImageUploader onImageLoad={setImage} />}
           </section>
 
           <section className="panel">
@@ -276,7 +288,7 @@ function App() {
               <button
                 className="export-btn"
                 onClick={handleExport}
-                disabled={!image || exporting}
+                disabled={(!image && !noImageMode) || exporting}
               >
                 {exporting
                   ? '⏳ 导出中...'
@@ -288,13 +300,14 @@ function App() {
         </div>
 
         <div className="preview-area">
-          {image ? (
+          {(image || noImageMode) ? (
             <PreviewCanvas
               image={image}
               effect={effect}
               shape={shape}
               params={params}
               canvasRef={canvasRef}
+              noImageMode={noImageMode}
             />
           ) : (
             <div className="preview-placeholder">
