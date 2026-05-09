@@ -41,6 +41,12 @@ function drawRingQuad(
   ], true).fill({ color, alpha: 1 });
 }
 
+function getSquareTrackCornerRadius(outerHalf: number, half: number) {
+  const inset = outerHalf - half;
+  if (inset <= 0) return SQUARE_CORNER_RADIUS + Math.abs(inset);
+  return Math.max(Math.min(SQUARE_CORNER_RADIUS - inset, half), 0);
+}
+
 export class ParticleEngine {
   particles: Particle[] = [];
   private time = 0;
@@ -198,21 +204,20 @@ export class ParticleEngine {
       return { x: cx + Math.cos(angle) * r, y: cy + Math.sin(angle) * r, nx: Math.cos(angle), ny: Math.sin(angle) };
     } else {
       const half = r;
-      const perim = half * 8;
-      const d = (t * perim) % perim;
-      if (d < half * 2) {
-        const x = cx - half + d;
-        return { x, y: cy - half, nx: 0, ny: -1 };
-      } else if (d < half * 4) {
-        const x = cx + half;
-        return { x, y: cy - half + (d - half * 2), nx: 1, ny: 0 };
-      } else if (d < half * 6) {
-        const x = cx + half - (d - half * 4);
-        return { x, y: cy + half, nx: 0, ny: 1 };
-      } else {
-        const x = cx - half;
-        return { x, y: cy + half - (d - half * 6), nx: -1, ny: 0 };
-      }
+      const cornerRadius = getSquareTrackCornerRadius(half, half);
+      const point = this.getRoundRectPoint(cx, cy, half, cornerRadius, t);
+      const sampleOffset = 0.0015;
+      const prev = this.getRoundRectPoint(cx, cy, half, cornerRadius, t - sampleOffset);
+      const next = this.getRoundRectPoint(cx, cy, half, cornerRadius, t + sampleOffset);
+      const tx = next.x - prev.x;
+      const ty = next.y - prev.y;
+      const tangentLen = Math.hypot(tx, ty) || 1;
+      return {
+        x: point.x,
+        y: point.y,
+        nx: ty / tangentLen,
+        ny: -tx / tangentLen,
+      };
     }
   }
 
@@ -247,6 +252,124 @@ export class ParticleEngine {
     if (d < arcLen) { const a = Math.PI + d / r; return { x: cx - half + r + Math.cos(a) * r, y: cy - half + r + Math.sin(a) * r }; }
 
     return { x: cx - half + r, y: cy - half };
+  }
+
+  private drawRoundRectSegment(
+    g: PIXI.Graphics,
+    cx: number,
+    cy: number,
+    half: number,
+    radius: number,
+    tStart: number,
+    tEnd: number,
+    stroke: { width: number; color: number; alpha: number },
+  ) {
+    let from = ((tStart % 1) + 1) % 1;
+    let to = tEnd;
+    while (to < from) to += 1;
+    const steps = Math.max(5, Math.ceil((to - from) * 120));
+    const first = this.getRoundRectPoint(cx, cy, half, radius, from);
+    g.moveTo(first.x, first.y);
+    for (let i = 1; i <= steps; i++) {
+      const t = from + ((to - from) * i) / steps;
+      const p = this.getRoundRectPoint(cx, cy, half, radius, t);
+      g.lineTo(p.x, p.y);
+    }
+    g.stroke(stroke);
+  }
+
+  private isInsideShapePoint(x: number, y: number, cx: number, cy: number, half: number, inset = 0) {
+    const effectiveHalf = Math.max(half - inset, 0);
+    if (this.shape === 'circle') {
+      const dx = x - cx;
+      const dy = y - cy;
+      return dx * dx + dy * dy <= effectiveHalf * effectiveHalf;
+    }
+
+    const radius = getSquareTrackCornerRadius(half, effectiveHalf);
+    const innerHalf = Math.max(effectiveHalf - radius, 0);
+    const dx = Math.abs(x - cx);
+    const dy = Math.abs(y - cy);
+
+    if ((dx <= innerHalf && dy <= effectiveHalf) || (dy <= innerHalf && dx <= effectiveHalf)) {
+      return true;
+    }
+
+    const cornerDx = dx - innerHalf;
+    const cornerDy = dy - innerHalf;
+    return cornerDx * cornerDx + cornerDy * cornerDy <= radius * radius;
+  }
+
+  private projectInsideShapePoint(x: number, y: number, cx: number, cy: number, half: number, inset = 0) {
+    const effectiveHalf = Math.max(half - inset, 1);
+    if (this.shape === 'circle') {
+      const dx = x - cx;
+      const dy = y - cy;
+      const len = Math.hypot(dx, dy) || 1;
+      if (len <= effectiveHalf) return { x, y };
+      const scale = effectiveHalf / len;
+      return { x: cx + dx * scale, y: cy + dy * scale };
+    }
+
+    const radius = getSquareTrackCornerRadius(half, effectiveHalf);
+    const innerHalf = Math.max(effectiveHalf - radius, 0);
+    const lx = x - cx;
+    const ly = y - cy;
+    const sx = lx === 0 ? 1 : Math.sign(lx);
+    const sy = ly === 0 ? 1 : Math.sign(ly);
+    const dx = Math.abs(lx);
+    const dy = Math.abs(ly);
+
+    if (this.isInsideShapePoint(x, y, cx, cy, half, inset)) {
+      return { x, y };
+    }
+
+    if (dx <= innerHalf) {
+      return { x: cx + lx, y: cy + sy * effectiveHalf };
+    }
+    if (dy <= innerHalf) {
+      return { x: cx + sx * effectiveHalf, y: cy + ly };
+    }
+
+    const cornerCx = sx * innerHalf;
+    const cornerCy = sy * innerHalf;
+    const vx = lx - cornerCx;
+    const vy = ly - cornerCy;
+    const vLen = Math.hypot(vx, vy) || 1;
+    const scale = radius / vLen;
+    return {
+      x: cx + cornerCx + vx * scale,
+      y: cy + cornerCy + vy * scale,
+    };
+  }
+
+  private getRandomPointInShape(cx: number, cy: number, half: number, inset = 0) {
+    const effectiveHalf = Math.max(half - inset, 1);
+    if (this.shape === 'circle') {
+      const angle = Math.random() * Math.PI * 2;
+      const dist = Math.sqrt(Math.random()) * effectiveHalf;
+      return {
+        x: cx + Math.cos(angle) * dist,
+        y: cy + Math.sin(angle) * dist,
+      };
+    }
+
+    for (let i = 0; i < 24; i++) {
+      const x = cx + (Math.random() - 0.5) * effectiveHalf * 2;
+      const y = cy + (Math.random() - 0.5) * effectiveHalf * 2;
+      if (this.isInsideShapePoint(x, y, cx, cy, half, inset)) {
+        return { x, y };
+      }
+    }
+
+    return this.projectInsideShapePoint(
+      cx + (Math.random() - 0.5) * effectiveHalf * 2,
+      cy + (Math.random() - 0.5) * effectiveHalf * 2,
+      cx,
+      cy,
+      half,
+      inset,
+    );
   }
   private generateBolt(
     x1: number, y1: number, x2: number, y2: number,
@@ -675,15 +798,16 @@ export class ParticleEngine {
     const cx = cw / 2, cy = ch / 2;
     const layerCount = 2 + Math.floor(this.params.intensity / 25);
     const targetPerLayer = Math.floor(this.params.density / layerCount / 3) + 3;
+    const outerHalf = sz / 2;
 
     for (let layer = 0; layer < layerCount; layer++) {
-      // In circle mode, keep orbits inside the circle
-      const maxR = this.shape === 'circle' ? sz / 2 - 10 : sz / 2 + 8;
-      const layerR = maxR - layer * 18;
+      const maxR = this.shape === 'circle' ? sz / 2 - 10 : outerHalf - 14;
+      const layerR = maxR - layer * 16;
+      if (layerR <= 6) continue;
       const existing = this.particles.filter(p => p.orbitLayer === layer).length;
       const toSpawn = targetPerLayer - existing;
       for (let i = 0; i < toSpawn; i++) {
-        const angle = Math.random() * Math.PI * 2;
+        const angle = this.shape === 'circle' ? Math.random() * Math.PI * 2 : Math.random();
         const speedMult = 1 + (layerCount - layer) * 0.3;
         const angularSpeed = (0.012 + Math.random() * 0.02) * (this.params.speed / 50) * speedMult;
         const isDust = Math.random() < 0.3;
@@ -709,9 +833,18 @@ export class ParticleEngine {
     }
 
     this.particles = this.particles.filter(p => {
-      p.angle = (p.angle ?? 0) + (p.angularSpeed ?? 0);
-      p.x = cx + Math.cos(p.angle ?? 0) * (p.radius ?? 0);
-      p.y = cy + Math.sin(p.angle ?? 0) * (p.radius ?? 0);
+      if (this.shape === 'circle') {
+        p.angle = (p.angle ?? 0) + (p.angularSpeed ?? 0);
+        p.x = cx + Math.cos(p.angle ?? 0) * (p.radius ?? 0);
+        p.y = cy + Math.sin(p.angle ?? 0) * (p.radius ?? 0);
+      } else {
+        p.angle = (((p.angle ?? 0) + (p.angularSpeed ?? 0) / (Math.PI * 2)) % 1 + 1) % 1;
+        const half = Math.max(Math.min(p.radius ?? 0, outerHalf - 4), 8);
+        const cornerRadius = getSquareTrackCornerRadius(outerHalf, half);
+        const pt = this.getRoundRectPoint(cx, cy, half, cornerRadius, p.angle ?? 0);
+        p.x = pt.x;
+        p.y = pt.y;
+      }
 
       if (p.trail) {
         p.trail.push({ x: p.x, y: p.y, alpha: p.alpha, size: p.size });
@@ -728,24 +861,40 @@ export class ParticleEngine {
     const layerCount = 2 + Math.floor(this.params.intensity / 25);
     const colorNum = hexToNum(this.params.color);
     const secColorNum = hexToNum(this.params.secondaryColor);
+    const outerHalf = sz / 2;
 
     // Dashed orbit rings
     for (let i = 0; i < layerCount; i++) {
-      const maxR = this.shape === 'circle' ? sz / 2 - 15 : sz / 2 + 8;
-      const r = this.shape === 'circle' ? maxR - i * 15 : maxR + i * 18;
+      const maxR = this.shape === 'circle' ? sz / 2 - 15 : outerHalf - 15;
+      const r = this.shape === 'circle' ? maxR - i * 15 : maxR - i * 16;
+      if (r <= 6) continue;
       const ringColor = i % 2 === 0 ? colorNum : secColorNum;
       const dashCount = 40;
       for (let d = 0; d < dashCount; d++) {
         if (d % 2 === 0) {
-          const a1 = (d / dashCount) * Math.PI * 2;
-          const a2 = ((d + 1) / dashCount) * Math.PI * 2;
-          const steps = 4;
-          g.moveTo(cx + Math.cos(a1) * r, cy + Math.sin(a1) * r);
-          for (let s = 1; s <= steps; s++) {
-            const a = a1 + ((a2 - a1) * s) / steps;
-            g.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r);
+          if (this.shape === 'circle') {
+            const a1 = (d / dashCount) * Math.PI * 2;
+            const a2 = ((d + 1) / dashCount) * Math.PI * 2;
+            const steps = 4;
+            g.moveTo(cx + Math.cos(a1) * r, cy + Math.sin(a1) * r);
+            for (let s = 1; s <= steps; s++) {
+              const a = a1 + ((a2 - a1) * s) / steps;
+              g.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r);
+            }
+            g.stroke({ width: 1, color: ringColor, alpha: 0.08 });
+          } else {
+            const cornerRadius = getSquareTrackCornerRadius(outerHalf, r);
+            this.drawRoundRectSegment(
+              g,
+              cx,
+              cy,
+              r,
+              cornerRadius,
+              d / dashCount,
+              (d + 1) / dashCount,
+              { width: 1, color: ringColor, alpha: 0.08 },
+            );
           }
-          g.stroke({ width: 1, color: ringColor, alpha: 0.08 });
         }
       }
     }
@@ -787,11 +936,12 @@ export class ParticleEngine {
 
     const cx = cw / 2, cy = ch / 2;
     const segCount = Math.floor(this.params.density * 1.5) + 20;
+    const outerHalf = sz / 2;
 
     while (this.particles.length < segCount) {
-      const angle = Math.random() * Math.PI * 2;
+      const angle = this.shape === 'circle' ? Math.random() * Math.PI * 2 : Math.random();
       const ring = Math.floor(Math.random() * 3);
-      const baseR = this.shape === 'circle' ? sz / 2 - 15 + ring * 10 : sz / 2 + 6 + ring * 10;
+      const baseR = this.shape === 'circle' ? sz / 2 - 15 + ring * 10 : sz / 2 - 32 + ring * 10;
       const isArc = Math.random() < 0.2;
 
       this.particles.push({
@@ -812,14 +962,23 @@ export class ParticleEngine {
     }
 
     this.particles = this.particles.filter(p => {
-      p.angle = (p.angle ?? 0) + (p.angularSpeed ?? 0);
       const pulse = 1 + Math.sin(this.shieldPhase * 3 + (p.angle ?? 0) * 2 + (p.flowOffset ?? 0)) * 0.02;
       const hitShake = this.shieldHitTimer > 0
         ? (Math.random() - 0.5) * this.shieldHitTimer * 3
         : 0;
       const r = (p.radius ?? 0) * pulse + hitShake;
-      p.x = cx + Math.cos(p.angle ?? 0) * r;
-      p.y = cy + Math.sin(p.angle ?? 0) * r;
+      if (this.shape === 'circle') {
+        p.angle = (p.angle ?? 0) + (p.angularSpeed ?? 0);
+        p.x = cx + Math.cos(p.angle ?? 0) * r;
+        p.y = cy + Math.sin(p.angle ?? 0) * r;
+      } else {
+        p.angle = (((p.angle ?? 0) + (p.angularSpeed ?? 0) / (Math.PI * 2)) % 1 + 1) % 1;
+        const half = Math.max(Math.min(r, outerHalf - 4), 8);
+        const cornerRadius = getSquareTrackCornerRadius(outerHalf, half);
+        const pt = this.getRoundRectPoint(cx, cy, half, cornerRadius, p.angle ?? 0);
+        p.x = pt.x;
+        p.y = pt.y;
+      }
 
       if (p.trail) {
         p.trail.push({ x: p.x, y: p.y, alpha: p.alpha, size: p.size });
@@ -837,8 +996,10 @@ export class ParticleEngine {
 
   private drawShield(g: PIXI.Graphics, cw: number, ch: number, sz: number) {
     const cx = cw / 2, cy = ch / 2;
-    const baseR = this.shape === 'circle' ? sz / 2 - 15 : sz / 2;
+    const outerHalf = sz / 2;
+    const baseR = this.shape === 'circle' ? sz / 2 - 15 : sz / 2 - 32;
     const flowAngle = this.shieldPhase * 0.5;
+    const flowT = (((flowAngle / (Math.PI * 2)) % 1) + 1) % 1;
     const time = this.shieldPhase;
     const colorNum = hexToNum(this.params.color);
     const secColorNum = hexToNum(this.params.secondaryColor);
@@ -850,7 +1011,12 @@ export class ParticleEngine {
       const t = i / glowSteps;
       const radius = (baseR - 5) + (baseR + 50 - (baseR - 5)) * t;
       const alpha = outerAlpha * (1 - t) * 0.1;
-      g.circle(cx, cy, radius).fill({ color: colorNum, alpha });
+      if (this.shape === 'circle') {
+        g.circle(cx, cy, radius).fill({ color: colorNum, alpha });
+      } else {
+        const cornerRadius = getSquareTrackCornerRadius(outerHalf, radius);
+        g.roundRect(cx - radius, cy - radius, radius * 2, radius * 2, cornerRadius).fill({ color: colorNum, alpha });
+      }
     }
 
     // 3-layer shield rings
@@ -872,8 +1038,8 @@ export class ParticleEngine {
         g.closePath();
         g.stroke({ width: 1.5, color: ring.color, alpha: ringAlpha });
       } else {
-        // Square ring
-        g.rect(cx - ring.r, cy - ring.r, ring.r * 2, ring.r * 2);
+        const cornerRadius = getSquareTrackCornerRadius(outerHalf, ring.r);
+        g.roundRect(cx - ring.r, cy - ring.r, ring.r * 2, ring.r * 2, cornerRadius);
         g.stroke({ width: 1.5, color: ring.color, alpha: ringAlpha });
       }
     }
@@ -889,49 +1055,61 @@ export class ParticleEngine {
       const arcAlpha = 0.6 + Math.sin(time * 2 + i * 1.2) * 0.2;
       const arcColor = i % 2 === 0 ? 0xffffff : ring.color;
 
-      const steps = 16;
-      g.moveTo(
-        cx + Math.cos(arcStart) * ring.r,
-        cy + Math.sin(arcStart) * ring.r,
-      );
-      for (let s = 1; s <= steps; s++) {
-        const a = arcStart + (arcLen * s) / steps;
-        g.lineTo(cx + Math.cos(a) * ring.r, cy + Math.sin(a) * ring.r);
+      if (this.shape === 'circle') {
+        const steps = 16;
+        g.moveTo(
+          cx + Math.cos(arcStart) * ring.r,
+          cy + Math.sin(arcStart) * ring.r,
+        );
+        for (let s = 1; s <= steps; s++) {
+          const a = arcStart + (arcLen * s) / steps;
+          g.lineTo(cx + Math.cos(a) * ring.r, cy + Math.sin(a) * ring.r);
+        }
+        g.stroke({ width: 2.5, color: arcColor, alpha: arcAlpha });
+      } else {
+        const cornerRadius = getSquareTrackCornerRadius(outerHalf, ring.r);
+        const arcStartT = ((i / arcCount) + (time * (0.3 + ringIdx * 0.12)) / (Math.PI * 2)) % 1;
+        const arcLenT = arcLen / (Math.PI * 2);
+        this.drawRoundRectSegment(g, cx, cy, ring.r, cornerRadius, arcStartT, arcStartT + arcLenT, {
+          width: 2.5,
+          color: arcColor,
+          alpha: arcAlpha,
+        });
       }
-      g.stroke({ width: 2.5, color: arcColor, alpha: arcAlpha });
     }
 
     // Hex grid pattern
-    const hexSize = 14;
-    const hexR = baseR + 16;
-    const hexPulse = 0.14 + Math.sin(time * 3) * 0.06;
+    if (this.shape === 'circle') {
+      const hexSize = 14;
+      const hexR = baseR + 16;
+      const hexPulse = 0.14 + Math.sin(time * 3) * 0.06;
 
-    for (let row = -4; row <= 4; row++) {
-      for (let col = -4; col <= 4; col++) {
-        const hx = col * hexSize * 1.5;
-        const hy = row * hexSize * Math.sqrt(3) + (col % 2 ? hexSize * Math.sqrt(3) / 2 : 0);
-        const dist = Math.sqrt(hx * hx + hy * hy);
-        if (dist < hexR - hexSize || dist > hexR + hexSize) continue;
+      for (let row = -4; row <= 4; row++) {
+        for (let col = -4; col <= 4; col++) {
+          const hx = col * hexSize * 1.5;
+          const hy = row * hexSize * Math.sqrt(3) + (col % 2 ? hexSize * Math.sqrt(3) / 2 : 0);
+          const dist = Math.sqrt(hx * hx + hy * hy);
+          if (dist < hexR - hexSize || dist > hexR + hexSize) continue;
 
-        const cellAngle = Math.atan2(hy, hx);
-        const flowDist = Math.abs(((cellAngle - flowAngle + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
-        const flowBright = flowDist < 0.8 ? 1 - flowDist / 0.8 : 0;
+          const cellAngle = Math.atan2(hy, hx);
+          const flowDist = Math.abs(((cellAngle - flowAngle + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
+          const flowBright = flowDist < 0.8 ? 1 - flowDist / 0.8 : 0;
 
-        const hexAlpha = hexPulse + flowBright * 0.15;
-        // Draw hex
-        const centerX = cx + hx;
-        const centerY = cy + hy;
-        const hexR2 = hexSize * 0.5;
-        g.moveTo(
-          centerX + Math.cos(Math.PI / 6) * hexR2,
-          centerY + Math.sin(Math.PI / 6) * hexR2,
-        );
-        for (let v = 1; v < 6; v++) {
-          const va = (v / 6) * Math.PI * 2 + Math.PI / 6;
-          g.lineTo(centerX + Math.cos(va) * hexR2, centerY + Math.sin(va) * hexR2);
+          const hexAlpha = hexPulse + flowBright * 0.15;
+          const centerX = cx + hx;
+          const centerY = cy + hy;
+          const hexR2 = hexSize * 0.5;
+          g.moveTo(
+            centerX + Math.cos(Math.PI / 6) * hexR2,
+            centerY + Math.sin(Math.PI / 6) * hexR2,
+          );
+          for (let v = 1; v < 6; v++) {
+            const va = (v / 6) * Math.PI * 2 + Math.PI / 6;
+            g.lineTo(centerX + Math.cos(va) * hexR2, centerY + Math.sin(va) * hexR2);
+          }
+          g.closePath();
+          g.stroke({ width: 0.6, color: colorNum, alpha: hexAlpha });
         }
-        g.closePath();
-        g.stroke({ width: 0.6, color: colorNum, alpha: hexAlpha });
       }
     }
 
@@ -949,8 +1127,16 @@ export class ParticleEngine {
         }
       }
 
-      const pAngle = Math.atan2(p.y - cy, p.x - cx);
-      const flowProx = Math.abs(((pAngle - flowAngle + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
+      const pathPos = this.shape === 'circle'
+        ? Math.atan2(p.y - cy, p.x - cx)
+        : (p.angle ?? 0);
+      const flowProx = this.shape === 'circle'
+        ? Math.abs(((pathPos - flowAngle + Math.PI * 3) % (Math.PI * 2)) - Math.PI)
+        : Math.min(
+            Math.abs(pathPos - flowT),
+            Math.abs(pathPos - flowT + 1),
+            Math.abs(pathPos - flowT - 1),
+          ) * Math.PI * 2;
       const flowMod = flowProx < 1 ? 1 + (1 - flowProx) * 0.5 : 1;
 
       // Outer glow
@@ -970,7 +1156,12 @@ export class ParticleEngine {
         const t = i / hitSteps;
         const radius = (baseR - 10) + (baseR + 30 - (baseR - 10)) * t;
         const alpha = this.shieldHitTimer * 0.3 * (1 - t) * 0.3;
-        g.circle(cx, cy, radius).fill({ color: 0xffffff, alpha });
+        if (this.shape === 'circle') {
+          g.circle(cx, cy, radius).fill({ color: 0xffffff, alpha });
+        } else {
+          const cornerRadius = getSquareTrackCornerRadius(outerHalf, radius);
+          g.roundRect(cx - radius, cy - radius, radius * 2, radius * 2, cornerRadius).fill({ color: 0xffffff, alpha });
+        }
       }
     }
   }
@@ -1148,6 +1339,8 @@ export class ParticleEngine {
     const phase = this.ripplePhase;
     const intensity = this.params.intensity / 100;
     const ringCount = 4 + Math.floor(intensity * 3);
+    const colorNum = hexToNum(this.params.color);
+    const secColorNum = hexToNum(this.params.secondaryColor);
 
     // Concentric expanding rings
     for (let i = 0; i < ringCount; i++) {
@@ -1155,7 +1348,14 @@ export class ParticleEngine {
       const radius = r * 0.3 + t * r * 0.9;
       const alpha = (1 - t) * 0.35 * (0.5 + Math.sin(phase * 3 + i) * 0.3);
       if (alpha > 0.005) {
-        g.circle(cx, cy, radius).stroke({ width: 1.5 + (1 - t) * 1.5, color: hexToNum(this.params.color), alpha });
+        const width = 1.5 + (1 - t) * 1.5;
+        if (this.shape === 'circle') {
+          g.circle(cx, cy, radius).stroke({ width, color: colorNum, alpha });
+        } else {
+          const cornerRadius = getSquareTrackCornerRadius(r, radius);
+          g.roundRect(cx - radius, cy - radius, radius * 2, radius * 2, cornerRadius)
+            .stroke({ width, color: colorNum, alpha });
+        }
       }
     }
 
@@ -1165,7 +1365,13 @@ export class ParticleEngine {
       const radius = r * 0.2 + t * r * 0.85;
       const alpha = (1 - t) * 0.2 * (0.5 + Math.cos(phase * 2 + i * 1.5) * 0.3);
       if (alpha > 0.005) {
-        g.circle(cx, cy, radius).stroke({ width: 1, color: hexToNum(this.params.secondaryColor), alpha });
+        if (this.shape === 'circle') {
+          g.circle(cx, cy, radius).stroke({ width: 1, color: secColorNum, alpha });
+        } else {
+          const cornerRadius = getSquareTrackCornerRadius(r, radius);
+          g.roundRect(cx - radius, cy - radius, radius * 2, radius * 2, cornerRadius)
+            .stroke({ width: 1, color: secColorNum, alpha });
+        }
       }
     }
 
@@ -1173,7 +1379,15 @@ export class ParticleEngine {
     const glowAlpha = 0.03 + Math.sin(phase * 2) * 0.015;
     for (let i = 4; i >= 0; i--) {
       const t = i / 4;
-      g.circle(cx, cy, r * (0.5 + t * 0.6)).fill({ color: hexToNum(this.params.color), alpha: glowAlpha * (1 - t) });
+      const radius = r * (0.5 + t * 0.6);
+      const alpha = glowAlpha * (1 - t);
+      if (this.shape === 'circle') {
+        g.circle(cx, cy, radius).fill({ color: colorNum, alpha });
+      } else {
+        const cornerRadius = getSquareTrackCornerRadius(r, radius);
+        g.roundRect(cx - radius, cy - radius, radius * 2, radius * 2, cornerRadius)
+          .fill({ color: colorNum, alpha });
+      }
     }
 
     // Shimmer particles
@@ -1861,10 +2075,12 @@ export class ParticleEngine {
     const cx = cw / 2, cy = ch / 2;
     const dotCount = 3 + Math.floor(this.params.intensity / 25);
     const orbitR = sz * 0.25;
-    const targetCount = dotCount * 6; // dots + trails
+    const outerHalf = sz / 2;
 
-    while (this.particles.length < targetCount) {
-      const idx = this.particles.length % dotCount;
+    this.particles = this.particles.filter(p => (p.orbitLayer ?? 0) < dotCount);
+
+    for (let idx = 0; idx < dotCount; idx++) {
+      if (this.particles.some(p => p.orbitLayer === idx)) continue;
       const angle = (idx / dotCount) * Math.PI * 2;
       this.particles.push({
         x: cx + Math.cos(angle) * orbitR,
@@ -1888,8 +2104,17 @@ export class ParticleEngine {
       const phase = mainAngle - (idx / dotCount) * Math.PI * 0.5;
       // Ease in/out for each dot
       const eased = phase + Math.sin(phase * 2) * 0.3;
-      p.x = cx + Math.cos(eased) * (p.radius ?? 0);
-      p.y = cy + Math.sin(eased) * (p.radius ?? 0);
+      if (this.shape === 'circle') {
+        p.x = cx + Math.cos(eased) * (p.radius ?? 0);
+        p.y = cy + Math.sin(eased) * (p.radius ?? 0);
+      } else {
+        const half = Math.max(Math.min(p.radius ?? orbitR, outerHalf - 12), 8);
+        const cornerRadius = getSquareTrackCornerRadius(outerHalf, half);
+        const trackT = (((eased / (Math.PI * 2)) % 1) + 1) % 1;
+        const pt = this.getRoundRectPoint(cx, cy, half, cornerRadius, trackT);
+        p.x = pt.x;
+        p.y = pt.y;
+      }
       // Pulse size
       const pulse = 0.7 + 0.3 * Math.sin(this.loaderTime * 8 + idx);
       p.size = (3 + Math.sin(idx) * 1.5) * pulse;
@@ -1902,6 +2127,8 @@ export class ParticleEngine {
   private drawLoader(g: PIXI.Graphics, cw: number, ch: number, sz: number) {
     const cx = cw / 2, cy = ch / 2;
     const colorNum = hexToNum(this.params.color);
+    const outerHalf = sz / 2;
+    const orbitHalf = Math.max(Math.min(sz * 0.25, outerHalf - 12), 8);
 
     // Center pulsing circle
     const breathe = 0.06 + 0.04 * Math.sin(this.loaderTime * 4);
@@ -1919,7 +2146,13 @@ export class ParticleEngine {
     }
 
     // Orbit path hint
-    g.circle(cx, cy, sz * 0.25).stroke({ color: colorNum, alpha: 0.08, width: 1 });
+    if (this.shape === 'circle') {
+      g.circle(cx, cy, sz * 0.25).stroke({ color: colorNum, alpha: 0.08, width: 1 });
+    } else {
+      const cornerRadius = getSquareTrackCornerRadius(outerHalf, orbitHalf);
+      g.roundRect(cx - orbitHalf, cy - orbitHalf, orbitHalf * 2, orbitHalf * 2, cornerRadius)
+        .stroke({ color: colorNum, alpha: 0.08, width: 1 });
+    }
   }
 
   // ════════════════════════════════════════════════════════════════════
@@ -2121,11 +2354,10 @@ export class ParticleEngine {
     const targetCount = Math.floor(this.params.density * 0.8) + 15;
 
     while (this.particles.length < targetCount) {
-      const angle = Math.random() * Math.PI * 2;
-      const dist = Math.random() * r * 0.85;
+      const spawn = this.getRandomPointInShape(cx, cy, r, r * 0.1);
       this.particles.push({
-        x: cx + Math.cos(angle) * dist,
-        y: cy + Math.sin(angle) * dist,
+        x: spawn.x,
+        y: spawn.y,
         vx: (Math.random() - 0.5) * 0.3,
         vy: (Math.random() - 0.5) * 0.3,
         life: 400 + Math.random() * 600,
@@ -2148,11 +2380,12 @@ export class ParticleEngine {
       p.x += p.vx + Math.sin(this.fireflyTime * (p.swaySpeed ?? 1) + (p.swayPhase ?? 0)) * 0.2;
       p.y += p.vy + Math.cos(this.fireflyTime * (p.swaySpeed ?? 1) + (p.swayPhase ?? 0)) * 0.15;
 
-      const dx = p.x - cx, dy = p.y - cy;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist > r * 0.9) {
-        p.vx -= dx * 0.001;
-        p.vy -= dy * 0.001;
+      if (!this.isInsideShapePoint(p.x, p.y, cx, cy, r, r * 0.08)) {
+        const projected = this.projectInsideShapePoint(p.x, p.y, cx, cy, r, r * 0.08);
+        p.vx = (p.vx ?? 0) * -0.35;
+        p.vy = (p.vy ?? 0) * -0.35;
+        p.x = projected.x;
+        p.y = projected.y;
       }
 
       const flicker = 0.3 + 0.7 * Math.abs(Math.sin(this.fireflyTime * (p.flickerSpeed ?? 2) + (p.flickerPhase ?? 0)));
@@ -2186,11 +2419,13 @@ export class ParticleEngine {
     const targetCount = Math.floor(this.params.density * 2) + 40;
 
     while (this.particles.length < targetCount) {
-      const angle = Math.random() * Math.PI * 2;
-      const dist = Math.random() * r * 0.9;
+      const x = this.shape === 'circle'
+        ? cx + (Math.random() - 0.5) * r * 1.6
+        : cx + (Math.random() - 0.5) * sz * 0.92;
+      const y = cy - r - Math.random() * r * 0.18;
       this.particles.push({
-        x: cx + Math.cos(angle) * dist,
-        y: cy - r + Math.random() * r * 0.3,
+        x,
+        y,
         vx: (Math.random() - 0.5) * 0.3,
         vy: 3 + Math.random() * 4,
         life: 60 + Math.random() * 80,
@@ -2216,6 +2451,8 @@ export class ParticleEngine {
         if (dx * dx + dy * dy > r * r) {
           p.life = 0;
         }
+      } else if (!this.isInsideShapePoint(p.x, p.y, cx, cy, r)) {
+        p.life = 0;
       }
 
       p.life -= 1;
