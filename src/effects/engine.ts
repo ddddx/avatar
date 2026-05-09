@@ -109,6 +109,10 @@ export class ParticleEngine {
   // SolidRing state
   private solidRingAngle = 0;
 
+  // Disc state
+  private discAngle = 0;
+  private discSparkles: { x: number; y: number; size: number; phase: number; speed: number }[] = [];
+
   setEffect(e: EffectType) { this.effect = e; this.particles = []; this.lightningBolts = []; }
   setShape(s: CropShape) { this.shape = s; }
   setParams(p: EffectParams) { this.params = p; }
@@ -140,6 +144,7 @@ export class ParticleEngine {
       case 'rain':      this.updateRain(canvasW, canvasH, imgSize); break;
       case 'ring':      this.updateRing(canvasW, canvasH, imgSize); break;
       case 'solidring': this.updateSolidRing(canvasW, canvasH, imgSize); break;
+      case 'disc':      this.updateDisc(canvasW, canvasH, imgSize); break;
     }
   }
 
@@ -168,6 +173,7 @@ export class ParticleEngine {
       case 'rain':      this.drawRain(g, canvasW, canvasH, imgSize); break;
       case 'ring':      this.drawRing(g, canvasW, canvasH, imgSize); break;
       case 'solidring': this.drawSolidRing(g, canvasW, canvasH, imgSize); break;
+      case 'disc':      this.drawDisc(g, canvasW, canvasH, imgSize); break;
     }
   }
 
@@ -2296,6 +2302,72 @@ export class ParticleEngine {
     }
   }
 
+  // ─── Disc ───
+  private initDiscSparkles(sz: number) {
+    const count = 30 + Math.floor(this.params.density * 0.8);
+    const r = sz / 2;
+    this.discSparkles = [];
+    for (let i = 0; i < count; i++) {
+      // distribute with center bias
+      const dist = Math.sqrt(Math.random());
+      const angle = Math.random() * Math.PI * 2;
+      this.discSparkles.push({
+        x: Math.cos(angle) * dist * r * 0.85,
+        y: Math.sin(angle) * dist * r * 0.85,
+        size: 1.5 + Math.random() * 4,
+        phase: Math.random() * Math.PI * 2,
+        speed: 1.5 + Math.random() * 3,
+      });
+    }
+  }
+
+  private updateDisc(_cw: number, _ch: number, sz: number) {
+    const spd = this.params.speed / 50;
+    this.discAngle += spd * 0.02;
+    if (this.discSparkles.length === 0) this.initDiscSparkles(sz);
+  }
+
+  private drawDisc(g: PIXI.Graphics, cw: number, ch: number, sz: number) {
+    const cx = cw / 2, cy = ch / 2;
+    const r = sz / 2;
+    const ringWidth = 4 + (this.params.intensity / 100) * 20;
+    const innerR = r - ringWidth;
+
+    // 1. White fill inside the ring
+    g.circle(cx, cy, innerR);
+    g.fill({ color: 0xffffff, alpha: 1 });
+
+    // 2. Four-color segmented ring (red, blue, green, yellow)
+    const colors = [0xff0040, 0x00b0ff, 0x00ff80, 0xffe000]; // red, blue, green, yellow
+    const ringR = r - ringWidth / 2;
+    for (let i = 0; i < 4; i++) {
+      const startAngle = this.discAngle + (i * Math.PI) / 2;
+      const endAngle = startAngle + Math.PI / 2;
+      g.beginPath();
+      g.arc(cx, cy, ringR, startAngle, endAngle);
+      g.stroke({ width: ringWidth, color: colors[i], alpha: 1 });
+    }
+
+    // 3. Sparkle points inside
+    if (this.discSparkles.length === 0) this.initDiscSparkles(sz);
+    const time = this.discAngle * 20; // faster flicker
+    for (const sp of this.discSparkles) {
+      const alpha = 0.3 + 0.7 * (0.5 + 0.5 * Math.sin(time * sp.speed + sp.phase));
+      const sx = cx + sp.x;
+      const sy = cy + sp.y;
+      const len = sp.size;
+      // Draw a small cross/star shape
+      g.beginPath();
+      g.moveTo(sx - len, sy);
+      g.lineTo(sx + len, sy);
+      g.stroke({ width: 1, color: 0x88ccff, alpha });
+      g.beginPath();
+      g.moveTo(sx, sy - len);
+      g.lineTo(sx, sy + len);
+      g.stroke({ width: 1, color: 0x88ccff, alpha });
+    }
+  }
+
   clear() {
     this.particles = [];
     this.lightningBolts = [];
@@ -2327,5 +2399,7 @@ export class ParticleEngine {
     this.rainTime = 0;
     this.ringTime = 0;
     this.solidRingAngle = 0;
+    this.discAngle = 0;
+    this.discSparkles = [];
   }
 }
