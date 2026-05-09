@@ -201,9 +201,35 @@ function App() {
       </header>
 
       <main className="app-main">
+        {/* Top: Effect selector */}
         <div className="sidebar">
           <section className="panel">
-            <h2 className="panel-title">📷 上传头像</h2>
+            <EffectSelector selected={effect} onChange={handleEffectChange} />
+          </section>
+        </div>
+
+        {/* Center: Preview */}
+        <div className="preview-area">
+          {(image || noImageMode) ? (
+            <PreviewCanvas
+              image={image}
+              effect={effect}
+              shape={shape}
+              params={params}
+              canvasRef={canvasRef}
+              noImageMode={noImageMode}
+            />
+          ) : (
+            <div className="preview-placeholder">
+              <div className="placeholder-icon">🖼️</div>
+              <p>上传一张头像图片开始创作</p>
+            </div>
+          )}
+        </div>
+
+        {/* Bottom: Controls bar */}
+        <div className="bottom-bar">
+          <section className="panel">
             <div className="no-image-toggle">
               <button
                 className={`shape-btn ${noImageMode ? 'active' : ''}`}
@@ -212,68 +238,55 @@ function App() {
                   if (!noImageMode) setImage(null);
                 }}
               >
-                {noImageMode ? '✅ 无图片模式' : '🖼️ 无图片模式'}
+                {noImageMode ? '✅ 无图' : '🖼️ 无图'}
               </button>
             </div>
             {!noImageMode && <ImageUploader onImageLoad={setImage} />}
           </section>
 
           <section className="panel">
-            <h2 className="panel-title">🎨 特效类型</h2>
-            <EffectSelector selected={effect} onChange={handleEffectChange} />
-          </section>
-
-          <section className="panel">
-            <h2 className="panel-title">⚙️ 参数调节</h2>
             <EffectControls params={params} onChange={setParams} />
           </section>
 
           <section className="panel">
-            <h2 className="panel-title">✂️ 形状裁剪</h2>
             <div className="shape-selector">
               <button
                 className={`shape-btn ${shape === 'circle' ? 'active' : ''}`}
                 onClick={() => setShape('circle')}
               >
-                ⭕ 圆形
+                ⭕
               </button>
               <button
                 className={`shape-btn ${shape === 'square' ? 'active' : ''}`}
                 onClick={() => setShape('square')}
               >
-                ⬜ 方形
+                ⬜
               </button>
             </div>
           </section>
 
           <section className="panel">
-            <h2 className="panel-title">💾 导出</h2>
             <div className="export-controls">
               <div className="format-toggle">
                 <button
                   className={`format-btn ${exportFormat === 'webm' ? 'active' : ''}`}
                   onClick={() => setExportFormat('webm')}
                   disabled={!supportsMediaRecorder}
-                  title={!supportsMediaRecorder ? '此浏览器不支持 WebM' : 'WebM 视频'}
                 >
-                  🎬 WebM
-                  {!supportsMediaRecorder && <span className="format-unsupported">✗</span>}
+                  🎬
                 </button>
                 <button
                   className={`format-btn ${exportFormat === 'gif' ? 'active' : ''}`}
                   onClick={() => setExportFormat('gif')}
                   disabled={!supportsWebWorkers}
-                  title={!supportsWebWorkers ? '此浏览器不支持 Web Worker' : 'GIF 动图'}
                 >
-                  🖼️ GIF
-                  {!supportsWebWorkers && <span className="format-unsupported">✗</span>}
+                  🖼️
                 </button>
                 <button
                   className={`format-btn ${exportFormat === 'frames' ? 'active' : ''}`}
                   onClick={() => setExportFormat('frames')}
-                  title="PNG 序列帧 (兼容性最好)"
                 >
-                  📁 序列帧
+                  📁
                 </button>
               </div>
               {exporting && (
@@ -292,31 +305,10 @@ function App() {
                 onClick={handleExport}
                 disabled={(!image && !noImageMode) || exporting}
               >
-                {exporting
-                  ? '⏳ 导出中...'
-                  : `导出 ${exportFormat === 'webm' ? 'WebM' : exportFormat === 'gif' ? 'GIF' : '序列帧'}`
-                }
+                {exporting ? '⏳' : '💾'}
               </button>
             </div>
           </section>
-        </div>
-
-        <div className="preview-area">
-          {(image || noImageMode) ? (
-            <PreviewCanvas
-              image={image}
-              effect={effect}
-              shape={shape}
-              params={params}
-              canvasRef={canvasRef}
-              noImageMode={noImageMode}
-            />
-          ) : (
-            <div className="preview-placeholder">
-              <div className="placeholder-icon">🖼️</div>
-              <p>上传一张头像图片开始创作</p>
-            </div>
-          )}
         </div>
       </main>
     </div>

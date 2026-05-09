@@ -29,34 +29,42 @@
 .app-main {
   flex: 1;
   display: flex;
+  flex-direction: column;
   gap: 0;
   min-height: 0;
+  overflow: hidden;
 }
 
 /* ─── Sidebar ─── */
 .sidebar {
-  width: 320px;
-  min-width: 320px;
-  border-right: 1px solid var(--border);
-  overflow-y: auto;
-  padding: 16px;
   display: flex;
-  flex-direction: column;
-  gap: 16px;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  flex-wrap: nowrap;
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.sidebar .panel {
+  flex-shrink: 0;
+  padding: 8px 12px;
 }
 
 .panel {
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 16px;
+  border-radius: 10px;
+  padding: 10px 14px;
 }
 
 .panel-title {
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--text-h);
-  margin: 0 0 12px;
+  margin: 0 0 6px;
+  white-space: nowrap;
 }
 
 /* ─── Preview Area ─── */
@@ -65,7 +73,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 32px;
+  padding: 16px;
   background:
     radial-gradient(circle at 30% 40%, rgba(139, 92, 246, 0.06) 0%, transparent 50%),
     radial-gradient(circle at 70% 60%, rgba(34, 211, 238, 0.06) 0%, transparent 50%);
@@ -153,16 +161,21 @@
 
 /* ─── Effect Selector ─── */
 .effect-selector {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.effect-selector::-webkit-scrollbar {
+  display: none;
 }
 
 .effect-btn {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 10px 12px;
+  gap: 4px;
+  padding: 6px 10px;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: transparent;
@@ -185,11 +198,12 @@
 }
 
 .effect-icon {
-  font-size: 18px;
+  font-size: 14px;
 }
 
 .effect-label {
-  font-size: 13px;
+  font-size: 11px;
+  white-space: nowrap;
 }
 
 /* ─── Effect Controls ─── */
@@ -376,6 +390,48 @@
   font-weight: 600;
   color: #fff;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+/* ─── Bottom Bar ─── */
+.bottom-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  border-top: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.15);
+  overflow-x: auto;
+  flex-wrap: nowrap;
+}
+
+.bottom-bar .panel {
+  flex-shrink: 0;
+  padding: 6px 10px;
+}
+
+.bottom-bar .export-controls {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+}
+
+.bottom-bar .format-toggle {
+  padding: 2px;
+}
+
+.bottom-bar .format-btn {
+  padding: 4px 8px;
+  font-size: 14px;
+}
+
+.bottom-bar .export-btn {
+  padding: 6px 14px;
+  font-size: 14px;
+}
+
+.bottom-bar .export-progress {
+  width: 80px;
+  height: 16px;
 }
 
 /* ─── Responsive ─── */
