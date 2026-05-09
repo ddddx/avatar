@@ -2196,9 +2196,9 @@ export class ParticleEngine {
 
   private drawRing(g: PIXI.Graphics, cw: number, ch: number, sz: number) {
     const cx = cw / 2, cy = ch / 2;
-    const r = this.shape === 'circle' ? sz / 2 : sz / 2 * 0.9;
     const time = this.ringTime;
     const ringWidth = 6 + (this.params.intensity / 100) * 10;
+    const r = this.shape === 'circle' ? sz / 2 - ringWidth : sz / 2 * 0.9;
     const steps = 120;
 
     const rainbowColors = [
@@ -2212,7 +2212,7 @@ export class ParticleEngine {
 
     // Draw multiple glow layers
     for (let layer = 3; layer >= 0; layer--) {
-      const layerR = r + ringWidth * 0.5 + layer * 3;
+      const layerR = r - layer * 2;
       const layerWidth = ringWidth + layer * 4;
       const layerAlpha = layer === 0 ? 0.8 : 0.15 / layer;
 
