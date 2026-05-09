@@ -103,15 +103,11 @@ export class ParticleEngine {
   // Rain state
   private rainTime = 0;
 
-  // Ring state
-  private ringTime = 0;
-
   // SolidRing state
   private solidRingAngle = 0;
 
   // Disc state
   private discAngle = 0;
-  private discSparkles: { x: number; y: number; size: number; phase: number; speed: number }[] = [];
 
   setEffect(e: EffectType) { this.effect = e; this.particles = []; this.lightningBolts = []; }
   setShape(s: CropShape) { this.shape = s; }
@@ -142,7 +138,6 @@ export class ParticleEngine {
       case 'aurora':    this.updateAurora(canvasW, canvasH, imgSize); break;
       case 'firefly':   this.updateFirefly(canvasW, canvasH, imgSize); break;
       case 'rain':      this.updateRain(canvasW, canvasH, imgSize); break;
-      case 'ring':      this.updateRing(canvasW, canvasH, imgSize); break;
       case 'solidring': this.updateSolidRing(canvasW, canvasH, imgSize); break;
       case 'disc':      this.updateDisc(canvasW, canvasH, imgSize); break;
     }
@@ -171,7 +166,6 @@ export class ParticleEngine {
       case 'aurora':    this.drawAurora(g, canvasW, canvasH, imgSize); break;
       case 'firefly':   this.drawFirefly(g, canvasW, canvasH, imgSize); break;
       case 'rain':      this.drawRain(g, canvasW, canvasH, imgSize); break;
-      case 'ring':      this.drawRing(g, canvasW, canvasH, imgSize); break;
       case 'solidring': this.drawSolidRing(g, canvasW, canvasH, imgSize); break;
       case 'disc':      this.drawDisc(g, canvasW, canvasH, imgSize); break;
     }
@@ -429,9 +423,9 @@ export class ParticleEngine {
         vy: -(1 + Math.random() * 2 * ext) * spd,
         life: 25 + Math.random() * 35,
         maxLife: 60,
-        size: 3 + Math.random() * (5 + ext * 8),
+        size: 2.5 + Math.random() * (4 + ext * 6),
         color: '',
-        alpha: 0.9,
+        alpha: 0.5,
         trail: [],
       });
     }
@@ -457,24 +451,24 @@ export class ParticleEngine {
     const cx = cw / 2, cy = ch / 2, r = sz / 2;
 
     // Bottom glow circle
-    const glowIntensity = 0.15 + (this.params.intensity / 100) * 0.1;
+    const glowIntensity = 0.08 + (this.params.intensity / 100) * 0.06;
     const bottomY = cy + r;
     // Draw concentric circles for radial glow simulation
     const gradSteps = 8;
     for (let i = gradSteps; i >= 0; i--) {
       const t = i / gradSteps;
-      const radius = r * 1.5 * t;
-      const alpha = glowIntensity * 0.6 * (1 - t);
-      const color = lerpColor('#ff8028', '#ff5000', t);
+      const radius = r * 1.3 * t;
+      const alpha = glowIntensity * 0.4 * (1 - t);
+      const color = lerpColor('#cc5018', '#aa3000', t);
       g.circle(cx, bottomY, radius).fill({ color, alpha });
     }
 
     // Full radial glow
     for (let i = gradSteps; i >= 0; i--) {
       const t = i / gradSteps;
-      const radius = (r + 40) * t;
-      const alpha = glowIntensity * 0.5 * (1 - t) * 0.25;
-      g.circle(cx, cy, radius).fill({ color: 0xff7800, alpha });
+      const radius = (r + 30) * t;
+      const alpha = glowIntensity * 0.3 * (1 - t) * 0.2;
+      g.circle(cx, cy, radius).fill({ color: 0xcc5800, alpha });
     }
 
     // Sort particles
@@ -494,21 +488,21 @@ export class ParticleEngine {
 
       let colorNum: number;
       if (lifeRatio > 0.7) {
-        colorNum = lerpColor('#ffffff', '#ffffaa', (lifeRatio - 0.7) / 0.3);
+        colorNum = lerpColor('#ffcc66', '#ff9933', (lifeRatio - 0.7) / 0.3);
       } else if (lifeRatio > 0.5) {
-        colorNum = lerpColor('#ffffaa', '#ffaa00', (lifeRatio - 0.5) / 0.2);
+        colorNum = lerpColor('#ff9933', '#ee6600', (lifeRatio - 0.5) / 0.2);
       } else if (lifeRatio > 0.3) {
-        colorNum = lerpColor('#ffaa00', '#ff5500', (lifeRatio - 0.3) / 0.2);
+        colorNum = lerpColor('#ee6600', '#cc3300', (lifeRatio - 0.3) / 0.2);
       } else {
-        colorNum = lerpColor('#ff5500', '#cc1100', lifeRatio / 0.3);
+        colorNum = lerpColor('#cc3300', '#881100', lifeRatio / 0.3);
       }
 
       // Layer 1: large heat glow
-      g.circle(p.x, p.y, p.size * 3.5).fill({ color: colorNum, alpha: alpha * 0.14 * p.alpha });
+      g.circle(p.x, p.y, p.size * 3).fill({ color: colorNum, alpha: alpha * 0.08 * p.alpha });
       // Layer 2: mid transition
-      g.circle(p.x, p.y, p.size * 1.8).fill({ color: colorNum, alpha: alpha * 0.35 * p.alpha });
+      g.circle(p.x, p.y, p.size * 1.5).fill({ color: colorNum, alpha: alpha * 0.2 * p.alpha });
       // Layer 3: bright core
-      g.circle(p.x, p.y, p.size).fill({ color: colorNum, alpha: alpha * 0.8 * p.alpha });
+      g.circle(p.x, p.y, p.size).fill({ color: colorNum, alpha: alpha * 0.5 * p.alpha });
     }
   }
 
@@ -2212,96 +2206,6 @@ export class ParticleEngine {
     }
   }
   // ════════════════════════════════════════════════════════════════════
-  // RING (Google One style)
-  // ════════════════════════════════════════════════════════════════════
-
-  private updateRing(_cw: number, _ch: number, _sz: number) {
-    this.ringTime += 0.016 * (this.params.speed / 50);
-  }
-
-  private drawRing(g: PIXI.Graphics, cw: number, ch: number, sz: number) {
-    const cx = cw / 2, cy = ch / 2;
-    const time = this.ringTime;
-    const ringWidth = 10 + (this.params.intensity / 100) * 30;
-    const r = sz / 2 - ringWidth / 2;
-    const steps = 120;
-
-    const rainbowColors = [
-      this.params.color,
-      this.params.secondaryColor,
-      '#fbbf24',
-      '#34d399',
-      '#60a5fa',
-      this.params.color,
-    ];
-
-    if (this.shape === 'square') {
-      // Rectangular ring: draw gradient segments along 4 sides
-      for (let layer = 1; layer >= 0; layer--) {
-        const layerR = r - layer * 2;
-        const layerWidth = layer === 0 ? ringWidth : ringWidth + 6;
-        const layerAlpha = layer === 0 ? 0.9 : 0.25;
-
-        for (let i = 0; i < steps; i++) {
-          const t = i / steps;
-          const tNext = (i + 1) / steps;
-
-          const colorT = (t + time * 0.3) % 1;
-          const colorIdx = colorT * (rainbowColors.length - 1);
-          const ci = Math.floor(colorIdx);
-          const cf = colorIdx - ci;
-          const color = lerpColor(
-            rainbowColors[ci],
-            rainbowColors[Math.min(ci + 1, rainbowColors.length - 1)],
-            cf
-          );
-
-          const p1 = this.getSquareEdgePointSimple(cx, cy, layerR, t);
-          const p2 = this.getSquareEdgePointSimple(cx, cy, layerR, tNext);
-
-          g.moveTo(p1.x, p1.y);
-          g.lineTo(p2.x, p2.y);
-          g.stroke({ width: layerWidth, color, alpha: layerAlpha, cap: 'round' });
-        }
-      }
-      return;
-    }
-
-    // Inner glow (behind the main ring, slightly wider + blurred feel)
-    for (let layer = 1; layer >= 0; layer--) {
-      // layer 1 = inner glow (larger width, lower alpha, shifted inward)
-      // layer 0 = main ring
-      const layerR = r - layer * 2;
-      const layerWidth = layer === 0 ? ringWidth : ringWidth + 6;
-      const layerAlpha = layer === 0 ? 0.9 : 0.25;
-
-      for (let i = 0; i < steps; i++) {
-        const t = i / steps;
-        const angle1 = t * Math.PI * 2;
-        const angle2 = (t + 1 / steps) * Math.PI * 2;
-
-        const colorT = (t + time * 0.3) % 1;
-        const colorIdx = colorT * (rainbowColors.length - 1);
-        const ci = Math.floor(colorIdx);
-        const cf = colorIdx - ci;
-        const color = lerpColor(
-          rainbowColors[ci],
-          rainbowColors[Math.min(ci + 1, rainbowColors.length - 1)],
-          cf
-        );
-
-        const x1 = cx + Math.cos(angle1) * layerR;
-        const y1 = cy + Math.sin(angle1) * layerR;
-        const x2 = cx + Math.cos(angle2) * layerR;
-        const y2 = cy + Math.sin(angle2) * layerR;
-
-        g.moveTo(x1, y1);
-        g.lineTo(x2, y2);
-        g.stroke({ width: layerWidth, color, alpha: layerAlpha, cap: 'round' });
-      }
-    }
-  }
-  // ════════════════════════════════════════════════════════════════════
   // SOLID RING
   // ════════════════════════════════════════════════════════════════════
 
@@ -2329,10 +2233,10 @@ export class ParticleEngine {
     const ringR = r - lineWidth / 2;
 
     if (this.shape === 'square') {
-      // Rectangular solid ring with vivid rainbow gradient
+      // Rectangular solid ring with vivid rainbow gradient (720 segments + overlap to eliminate gaps)
       for (let i = 0; i < steps; i++) {
         const t = i / steps;
-        const tNext = (i + 1) / steps;
+        const tOverlap = Math.min((i + 1) / steps + 0.002, 1);
 
         const colorT = (t + time * 0.3) % 1;
         const colorIdx = colorT * (rainbowColors.length - 1);
@@ -2345,11 +2249,11 @@ export class ParticleEngine {
         );
 
         const p1 = this.getSquareEdgePointSimple(cx, cy, ringR, t);
-        const p2 = this.getSquareEdgePointSimple(cx, cy, ringR, tNext);
+        const p2 = this.getSquareEdgePointSimple(cx, cy, ringR, tOverlap);
 
         g.moveTo(p1.x, p1.y);
         g.lineTo(p2.x, p2.y);
-        g.stroke({ width: lineWidth, color: segColor, alpha: 1, cap: 'round' });
+        g.stroke({ width: lineWidth, color: segColor, alpha: 1 });
       }
       return;
     }
@@ -2375,37 +2279,9 @@ export class ParticleEngine {
   }
 
   // ─── Disc ───
-  private initDiscSparkles(sz: number) {
-    const count = 30 + Math.floor(this.params.density * 0.8);
-    const r = sz / 2;
-    this.discSparkles = [];
-    for (let i = 0; i < count; i++) {
-      let x: number, y: number;
-      if (this.shape === 'square') {
-        // Uniform distribution within inner square area
-        x = (Math.random() - 0.5) * r * 1.7;
-        y = (Math.random() - 0.5) * r * 1.7;
-      } else {
-        // distribute with center bias (denser near center, sparse near edge)
-        const dist = Math.sqrt(Math.random());
-        const angle = Math.random() * Math.PI * 2;
-        x = Math.cos(angle) * dist * r * 0.85;
-        y = Math.sin(angle) * dist * r * 0.85;
-      }
-      this.discSparkles.push({
-        x,
-        y,
-        size: 1.5 + Math.random() * 4,
-        phase: Math.random() * Math.PI * 2,
-        speed: 1.5 + Math.random() * 3,
-      });
-    }
-  }
-
-  private updateDisc(_cw: number, _ch: number, sz: number) {
+  private updateDisc(_cw: number, _ch: number, _sz: number) {
     const spd = this.params.speed / 50;
     this.discAngle += spd * 0.02;
-    if (this.discSparkles.length === 0) this.initDiscSparkles(sz);
   }
 
   private drawDisc(g: PIXI.Graphics, cw: number, ch: number, sz: number) {
@@ -2420,13 +2296,13 @@ export class ParticleEngine {
     const discColors = [
       '#ff0040', '#ff8000', '#ffe000', '#00ff80', '#00b0ff', '#a040ff', '#ff0040',
     ];
-    const steps = 120;
+    const steps = 720;
 
     if (this.shape === 'square') {
-      // Rectangular disc ring with rotating rainbow gradient
+      // Rectangular disc ring with rotating rainbow gradient (720 segments + overlap to eliminate gaps)
       for (let i = 0; i < steps; i++) {
         const t = i / steps;
-        const tNext = (i + 1) / steps;
+        const tOverlap = Math.min((i + 1) / steps + 0.002, 1);
 
         // Rotate color gradient around the perimeter
         const colorT = ((t + this.discAngle / (Math.PI * 2)) % 1) * (discColors.length - 1);
@@ -2439,11 +2315,11 @@ export class ParticleEngine {
         );
 
         const p1 = this.getSquareEdgePointSimple(cx, cy, ringR, t);
-        const p2 = this.getSquareEdgePointSimple(cx, cy, ringR, tNext);
+        const p2 = this.getSquareEdgePointSimple(cx, cy, ringR, tOverlap);
 
         g.moveTo(p1.x, p1.y);
         g.lineTo(p2.x, p2.y);
-        g.stroke({ width: ringWidth, color: segColor, alpha: 1, cap: 'round' });
+        g.stroke({ width: ringWidth, color: segColor, alpha: 1 });
       }
     } else {
       for (let i = 0; i < steps; i++) {
@@ -2467,28 +2343,8 @@ export class ParticleEngine {
 
         g.moveTo(x1, y1);
         g.lineTo(x2, y2);
-        g.stroke({ width: ringWidth, color: segColor, alpha: 1, cap: 'round' });
+        g.stroke({ width: ringWidth, color: segColor, alpha: 1 });
       }
-    }
-
-    // 2. Sparkle/star points on transparent center area
-    if (this.discSparkles.length === 0) this.initDiscSparkles(sz);
-    const time = this.discAngle * 20; // faster flicker
-    for (const sp of this.discSparkles) {
-      // Alpha pulsing between 0.3 and 0.8
-      const alpha = 0.3 + 0.5 * (0.5 + 0.5 * Math.sin(time * sp.speed + sp.phase));
-      const sx = cx + sp.x;
-      const sy = cy + sp.y;
-      const len = sp.size;
-      // Draw a small cross/star shape in light cyan
-      g.beginPath();
-      g.moveTo(sx - len, sy);
-      g.lineTo(sx + len, sy);
-      g.stroke({ width: 1, color: 0x80e0ff, alpha });
-      g.beginPath();
-      g.moveTo(sx, sy - len);
-      g.lineTo(sx, sy + len);
-      g.stroke({ width: 1, color: 0x80e0ff, alpha });
     }
   }
 
@@ -2521,9 +2377,7 @@ export class ParticleEngine {
 
     this.fireflyTime = 0;
     this.rainTime = 0;
-    this.ringTime = 0;
     this.solidRingAngle = 0;
     this.discAngle = 0;
-    this.discSparkles = [];
   }
 }

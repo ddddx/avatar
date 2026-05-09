@@ -27,7 +27,6 @@ const effects: { type: EffectType; icon: string; label: string }[] = [
   { type: 'aurora',    icon: '🌌', label: '极光' },
   { type: 'firefly',   icon: '🪲', label: '萤火虫' },
   { type: 'rain',      icon: '🌧️', label: '雨' },
-  { type: 'ring',      icon: '💍', label: '光环' },
   { type: 'solidring', icon: '⭕', label: '实心环' },
   { type: 'disc',     icon: '💿', label: '光盘' },
 ];

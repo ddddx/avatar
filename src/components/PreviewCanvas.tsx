@@ -156,7 +156,7 @@ const PreviewCanvas: React.FC<Props> = ({ image, gifData, effect, shape, params,
 
       // Create glow layer (blurred, underneath) — soft light halo
       const glowGfx = new PIXI.Graphics();
-      if (effect !== 'solidring' && effect !== 'ring') {
+      if (effect !== 'solidring') {
         glowGfx.blendMode = 'add';
         if (maskRef.current) glowGfx.mask = maskRef.current;
         const blurFilter = new PIXI.BlurFilter({ strength: 8, quality: 3 });
@@ -204,7 +204,7 @@ const PreviewCanvas: React.FC<Props> = ({ image, gifData, effect, shape, params,
         engine.update(SIZE, SIZE, imgSize);
         // For ring/solidring, skip glow layer to avoid additive double-draw
         // that washes out the rainbow colors to white
-        if (effect !== 'ring' && effect !== 'solidring') {
+        if (effect !== 'solidring') {
           engine.draw(glowGfx, SIZE, SIZE, imgSize);   // blurred glow
         } else {
           glowGfx.clear();
