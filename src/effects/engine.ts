@@ -2232,7 +2232,7 @@ export class ParticleEngine {
     const cx = cw / 2, cy = ch / 2;
     const r = sz / 2;
     const lineWidth = 4 + (this.params.intensity / 100) * 36;
-    const steps = 720;
+    const steps = 1440;
     const time = this.solidRingAngle;
 
     // Vivid gradient: red → orange → green → blue
@@ -2307,7 +2307,7 @@ export class ParticleEngine {
     const discColors = [
       '#ff0040', '#ff8000', '#ffe000', '#00ff80', '#00b0ff', '#a040ff', '#ff0040',
     ];
-    const steps = 720;
+    const steps = 1440;
 
     if (this.shape === 'square') {
       const cornerRadius = 16;
