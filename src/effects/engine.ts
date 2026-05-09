@@ -103,6 +103,9 @@ export class ParticleEngine {
   // Rain state
   private rainTime = 0;
 
+  // Ring state
+  private ringTime = 0;
+
   setEffect(e: EffectType) { this.effect = e; this.particles = []; this.lightningBolts = []; }
   setShape(s: CropShape) { this.shape = s; }
   setParams(p: EffectParams) { this.params = p; }
@@ -132,6 +135,7 @@ export class ParticleEngine {
       case 'aurora':    this.updateAurora(canvasW, canvasH, imgSize); break;
       case 'firefly':   this.updateFirefly(canvasW, canvasH, imgSize); break;
       case 'rain':      this.updateRain(canvasW, canvasH, imgSize); break;
+      case 'ring':      this.updateRing(canvasW, canvasH, imgSize); break;
     }
   }
 
@@ -158,6 +162,7 @@ export class ParticleEngine {
       case 'aurora':    this.drawAurora(g, canvasW, canvasH, imgSize); break;
       case 'firefly':   this.drawFirefly(g, canvasW, canvasH, imgSize); break;
       case 'rain':      this.drawRain(g, canvasW, canvasH, imgSize); break;
+      case 'ring':      this.drawRing(g, canvasW, canvasH, imgSize); break;
     }
   }
 
@@ -190,7 +195,7 @@ export class ParticleEngine {
   }
 
   // ════════════════════════════════════════════════════════════════════
-  // �?LIGHTNING
+  // �?LIGHTNING
   // ════════════════════════════════════════════════════════════════════
 
   private generateBolt(
@@ -313,7 +318,7 @@ export class ParticleEngine {
       const flashAlpha = progress > 0.7 ? 1 : 0.6 + Math.sin(progress * Math.PI * 8) * 0.4;
       const baseAlpha = fadeAlpha * flashAlpha * bolt.glow;
 
-      // 3-layer glow: outer (thick, low alpha) �?mid �?core (thin, high alpha)
+      // 3-layer glow: outer (thick, low alpha) �?mid �?core (thin, high alpha)
       const layers = [
         { width: 4, color: 0x4488ff, alpha: baseAlpha * 0.35 },
         { width: 2, color: 0x88bbff, alpha: baseAlpha * 0.65 },
@@ -483,7 +488,7 @@ export class ParticleEngine {
   }
 
   // ════════════════════════════════════════════════════════════════════
-  // �?GLOW
+  // �?GLOW
   // ════════════════════════════════════════════════════════════════════
 
   private updateGlow(cw: number, ch: number, sz: number) {
@@ -1209,7 +1214,7 @@ export class ParticleEngine {
   }
 
   // ════════════════════════════════════════════════════════════════════
-  // �?STARDUST
+  // �?STARDUST
   // ════════════════════════════════════════════════════════════════════
 
   private updateStardust(cw: number, ch: number, sz: number) {
@@ -1436,7 +1441,7 @@ export class ParticleEngine {
   }
 
   // ════════════════════════════════════════════════════════════════════
-  // 🌪�?VORTEX
+  // 🌪�?VORTEX
   // ════════════════════════════════════════════════════════════════════
 
   private updateVortex(cw: number, ch: number, sz: number) {
@@ -1662,7 +1667,7 @@ export class ParticleEngine {
   }
 
   // ════════════════════════════════════════════════════════════════════
-  // �?GOLD
+  // �?GOLD
   // ════════════════════════════════════════════════════════════════════
 
   private updateGold(cw: number, ch: number, _sz: number) {
@@ -1798,7 +1803,7 @@ export class ParticleEngine {
   }
 
   // ════════════════════════════════════════════════════════════════════
-  // �?LOADER
+  // �?LOADER
   // ════════════════════════════════════════════════════════════════════
 
   private updateLoader(cw: number, ch: number, sz: number) {
@@ -2181,6 +2186,70 @@ export class ParticleEngine {
       g.circle(p.x, p.y, p.size * 2).fill({ color: pColor, alpha: a * 0.15 });
     }
   }
+  // ════════════════════════════════════════════════════════════════════
+  // RING (Google One style)
+  // ════════════════════════════════════════════════════════════════════
+
+  private updateRing(_cw: number, _ch: number, _sz: number) {
+    this.ringTime += 0.016 * (this.params.speed / 50);
+  }
+
+  private drawRing(g: PIXI.Graphics, cw: number, ch: number, sz: number) {
+    const cx = cw / 2, cy = ch / 2;
+    const r = this.shape === 'circle' ? sz / 2 : sz / 2 * 0.9;
+    const time = this.ringTime;
+    const ringWidth = 6 + (this.params.intensity / 100) * 10;
+    const steps = 120;
+
+    const rainbowColors = [
+      this.params.color,
+      this.params.secondaryColor,
+      '#fbbf24',
+      '#34d399',
+      '#60a5fa',
+      this.params.color,
+    ];
+
+    // Draw multiple glow layers
+    for (let layer = 3; layer >= 0; layer--) {
+      const layerR = r + ringWidth * 0.5 + layer * 3;
+      const layerWidth = ringWidth + layer * 4;
+      const layerAlpha = layer === 0 ? 0.8 : 0.15 / layer;
+
+      for (let i = 0; i < steps; i++) {
+        const t = i / steps;
+        const angle1 = t * Math.PI * 2;
+        const angle2 = (t + 1 / steps) * Math.PI * 2;
+
+        const colorT = (t + time * 0.3) % 1;
+        const colorIdx = colorT * (rainbowColors.length - 1);
+        const ci = Math.floor(colorIdx);
+        const cf = colorIdx - ci;
+        const color = lerpColor(
+          rainbowColors[ci],
+          rainbowColors[Math.min(ci + 1, rainbowColors.length - 1)],
+          cf
+        );
+
+        const x1 = cx + Math.cos(angle1) * layerR;
+        const y1 = cy + Math.sin(angle1) * layerR;
+        const x2 = cx + Math.cos(angle2) * layerR;
+        const y2 = cy + Math.sin(angle2) * layerR;
+
+        g.moveTo(x1, y1);
+        g.lineTo(x2, y2);
+        g.stroke({ width: layerWidth, color, alpha: layerAlpha, cap: 'round' });
+      }
+    }
+
+    // Inner highlight
+    const highlightAlpha = 0.1 + 0.05 * Math.sin(time * 3);
+    g.circle(cx, cy, r + ringWidth * 0.3).stroke({
+      color: 0xffffff,
+      alpha: highlightAlpha,
+      width: 1,
+    });
+  }
   clear() {
     this.particles = [];
     this.lightningBolts = [];
@@ -2210,5 +2279,6 @@ export class ParticleEngine {
 
     this.fireflyTime = 0;
     this.rainTime = 0;
+    this.ringTime = 0;
   }
 }
