@@ -205,6 +205,7 @@ export class ParticleEngine {
       const boltCount = 1 + Math.floor(this.params.density / 30);
 
       for (let i = 0; i < boltCount; i++) {
+        // // CROSSBOLT_MARKER_TEST_12345
         // Cross-bolt: edge-to-edge, or edge-to-center
         const t1 = Math.random();
         const ep1 = this.getEdgePoint(cw, ch, sz, t1);
