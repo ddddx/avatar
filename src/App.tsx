@@ -109,34 +109,37 @@ function App() {
     const frameCount = Math.floor((duration / 1000) * fps);
     const frameDelay = Math.round(1000 / fps);
 
-    // For no-image mode: create offscreen canvas + read alpha directly
+    // For no-image mode: composite WebGL canvas over magenta via drawImage,
+    // then snap near-magenta pixels to exact magenta for gif.js transparency.
     let offscreen: HTMLCanvasElement | null = null;
     let offCtx: CanvasRenderingContext2D | null = null;
-    let srcCtx: CanvasRenderingContext2D | null = null;
     if (noImageMode) {
       offscreen = document.createElement('canvas');
       offscreen.width = canvas.width;
       offscreen.height = canvas.height;
       offCtx = offscreen.getContext('2d')!;
-      srcCtx = canvas.getContext('2d')!;
     }
+    const MAGENTA_THRESHOLD_SQ = 40 * 40; // 40^2
 
     // Capture frames
     for (let i = 0; i < frameCount; i++) {
-      if (noImageMode && offscreen && offCtx && srcCtx) {
-        // Read raw pixels from PIXI canvas (has real alpha channel)
-        const imgData = srcCtx.getImageData(0, 0, canvas.width, canvas.height);
+      if (noImageMode && offscreen && offCtx) {
+        // 1. Fill with magenta (the transparent color key)
+        offCtx.fillStyle = '#ff00ff';
+        offCtx.fillRect(0, 0, offscreen.width, offscreen.height);
+        // 2. Draw WebGL canvas on top — composites transparent PIXI pixels over magenta
+        offCtx.drawImage(canvas, 0, 0);
+        // 3. Snap near-magenta to exact magenta so gif.js matches them
+        const imgData = offCtx.getImageData(0, 0, offscreen.width, offscreen.height);
         const px = imgData.data;
-        // Replace: transparent pixels → magenta, opaque pixels → keep color
         for (let j = 0; j < px.length; j += 4) {
-          if (px[j + 3] < 128) {
-            px[j] = 255;     // R
-            px[j + 1] = 0;   // G
-            px[j + 2] = 255; // B
-            px[j + 3] = 255; // A
-          } else {
-            px[j + 3] = 255; // force fully opaque
+          const dr = px[j] - 255;
+          const dg = px[j + 1];
+          const db = px[j + 2] - 255;
+          if (dr * dr + dg * dg + db * db < MAGENTA_THRESHOLD_SQ) {
+            px[j] = 255; px[j + 1] = 0; px[j + 2] = 255;
           }
+          px[j + 3] = 255;
         }
         offCtx.putImageData(imgData, 0, 0);
         gif.addFrame(offscreen, { copy: true, delay: frameDelay });
