@@ -152,7 +152,7 @@ function App() {
 
       gif.render();
     });
-  }, [effect, downloadBlob]);
+  }, [effect, downloadBlob, noImageMode]);
 
   // Export as PNG sequence frames (most compatible)
   const exportFrames = useCallback(async (canvas: HTMLCanvasElement) => {
