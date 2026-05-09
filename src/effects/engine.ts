@@ -199,19 +199,6 @@ export class ParticleEngine {
     }
   }
 
-  /** Get a point on a rectangular edge, parameterized by t ∈ [0,1) around the perimeter. */
-  private getSquareEdgePointSimple(cx: number, cy: number, half: number, t: number): { x: number; y: number } {
-    const d = ((t % 1) + 1) % 1;
-    const sideLen = half * 2;
-    const side = Math.floor(d * 4);
-    const frac = (d * 4) % 1;
-    switch (side) {
-      case 0:  return { x: cx - half + frac * sideLen, y: cy - half };
-      case 1:  return { x: cx + half, y: cy - half + frac * sideLen };
-      case 2:  return { x: cx + half - frac * sideLen, y: cy + half };
-      default: return { x: cx - half, y: cy + half - frac * sideLen };
-    }
-  }
 
   // ════════════════════════════════════════════════════════════════════
   // �?LIGHTNING
@@ -2233,15 +2220,22 @@ export class ParticleEngine {
     const ringR = r - lineWidth / 2;
 
     if (this.shape === 'square') {
-      // Draw each of the 4 sides independently to avoid corner artifacts.
-      // No segment crosses a corner boundary (t=0.25, 0.5, 0.75, 1.0).
+      // Draw each of 4 sides with direct linear interpolation.
+      // Corner coordinates are exact (cx±half, cy±half) so no gaps or diagonal lines.
+      const half = ringR;
+      const sides = [
+        { x1: cx - half, y1: cy - half, x2: cx + half, y2: cy - half }, // top
+        { x1: cx + half, y1: cy - half, x2: cx + half, y2: cy + half }, // right
+        { x1: cx + half, y1: cy + half, x2: cx - half, y2: cy + half }, // bottom
+        { x1: cx - half, y1: cy + half, x2: cx - half, y2: cy - half }, // left
+      ];
       const stepsPerSide = steps / 4;
-      for (let side = 0; side < 4; side++) {
-        const sideStart = side / 4;
-        // Draw each segment on this side
-        for (let j = 0; j < stepsPerSide; j++) {
-          const t = sideStart + j / steps;
-          const colorT = (t + time * 0.3) % 1;
+      for (let s = 0; s < 4; s++) {
+        const side = sides[s];
+        for (let i = 0; i < stepsPerSide; i++) {
+          const t = i / stepsPerSide;
+          const globalT = (s * stepsPerSide + i) / steps;
+          const colorT = (globalT + time * 0.3) % 1;
           const colorIdx = colorT * (rainbowColors.length - 1);
           const ci = Math.floor(colorIdx);
           const cf = colorIdx - ci;
@@ -2250,11 +2244,12 @@ export class ParticleEngine {
             rainbowColors[Math.min(ci + 1, rainbowColors.length - 1)],
             cf
           );
-          const p1 = this.getSquareEdgePointSimple(cx, cy, ringR, t);
-          const p2t = sideStart + (j + 1) / steps;
-          const p2 = this.getSquareEdgePointSimple(cx, cy, ringR, p2t);
-          g.moveTo(p1.x, p1.y);
-          g.lineTo(p2.x, p2.y);
+          const x1 = side.x1 + (side.x2 - side.x1) * t;
+          const y1 = side.y1 + (side.y2 - side.y1) * t;
+          const x2 = side.x1 + (side.x2 - side.x1) * ((i + 1) / stepsPerSide);
+          const y2 = side.y1 + (side.y2 - side.y1) * ((i + 1) / stepsPerSide);
+          g.moveTo(x1, y1);
+          g.lineTo(x2, y2);
           g.stroke({ width: lineWidth, color: segColor, alpha: 1 });
         }
       }
@@ -2302,14 +2297,22 @@ export class ParticleEngine {
     const steps = 720;
 
     if (this.shape === 'square') {
-      // Draw each of the 4 sides independently to avoid corner artifacts.
-      // No segment crosses a corner boundary (t=0.25, 0.5, 0.75, 1.0).
+      // Draw each of 4 sides with direct linear interpolation.
+      // Corner coordinates are exact (cx±half, cy±half) so no gaps or diagonal lines.
+      const half = ringR;
+      const sides = [
+        { x1: cx - half, y1: cy - half, x2: cx + half, y2: cy - half }, // top
+        { x1: cx + half, y1: cy - half, x2: cx + half, y2: cy + half }, // right
+        { x1: cx + half, y1: cy + half, x2: cx - half, y2: cy + half }, // bottom
+        { x1: cx - half, y1: cy + half, x2: cx - half, y2: cy - half }, // left
+      ];
       const stepsPerSide = steps / 4;
-      for (let side = 0; side < 4; side++) {
-        const sideStart = side / 4;
-        for (let j = 0; j < stepsPerSide; j++) {
-          const t = sideStart + j / steps;
-          const colorT = ((t + this.discAngle / (Math.PI * 2)) % 1) * (discColors.length - 1);
+      for (let s = 0; s < 4; s++) {
+        const side = sides[s];
+        for (let i = 0; i < stepsPerSide; i++) {
+          const t = i / stepsPerSide;
+          const globalT = (s * stepsPerSide + i) / steps;
+          const colorT = ((globalT + this.discAngle / (Math.PI * 2)) % 1) * (discColors.length - 1);
           const ci = Math.floor(colorT);
           const cf = colorT - ci;
           const segColor = lerpColor(
@@ -2317,11 +2320,12 @@ export class ParticleEngine {
             discColors[Math.min(ci + 1, discColors.length - 1)],
             cf,
           );
-          const p1 = this.getSquareEdgePointSimple(cx, cy, ringR, t);
-          const p2t = sideStart + (j + 1) / steps;
-          const p2 = this.getSquareEdgePointSimple(cx, cy, ringR, p2t);
-          g.moveTo(p1.x, p1.y);
-          g.lineTo(p2.x, p2.y);
+          const x1 = side.x1 + (side.x2 - side.x1) * t;
+          const y1 = side.y1 + (side.y2 - side.y1) * t;
+          const x2 = side.x1 + (side.x2 - side.x1) * ((i + 1) / stepsPerSide);
+          const y2 = side.y1 + (side.y2 - side.y1) * ((i + 1) / stepsPerSide);
+          g.moveTo(x1, y1);
+          g.lineTo(x2, y2);
           g.stroke({ width: ringWidth, color: segColor, alpha: 1 });
         }
       }
