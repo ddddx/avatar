@@ -229,7 +229,8 @@ export class ParticleEngine {
   }
 
   private updateLightning(cw: number, ch: number, sz: number) {
-    this.lightningTimer += 1;
+    const spd = this.params.speed / 50;
+    this.lightningTimer += spd;
 
     this.lightningBolts = this.lightningBolts.filter(b => {
       b.life -= 1;
@@ -380,6 +381,7 @@ export class ParticleEngine {
   // ════════════════════════════════════════════════════════════════════
 
   private updateFire(cw: number, ch: number, sz: number) {
+    const spd = this.params.speed / 50;
     const spawnRate = Math.floor(this.params.density / 3) + 3;
     const ext = (this.params.intensity / 100);
     const cx = cw / 2, cy = ch / 2, r = sz / 2;
@@ -394,7 +396,7 @@ export class ParticleEngine {
         x: baseX + (Math.random() - 0.5) * 6,
         y: baseY,
         vx: (Math.random() - 0.5) * 0.8,
-        vy: -(1 + Math.random() * 2 * ext),
+        vy: -(1 + Math.random() * 2 * ext) * spd,
         life: 25 + Math.random() * 35,
         maxLife: 60,
         size: 3 + Math.random() * (5 + ext * 8),
@@ -923,6 +925,7 @@ export class ParticleEngine {
   // ════════════════════════════════════════════════════════════════════
 
   private updateFrost(cw: number, ch: number, sz: number) {
+    const spd = this.params.speed / 50;
     const densityFactor = this.params.density / 50;
 
     // Spawn ice crystals at edge
@@ -944,7 +947,7 @@ export class ParticleEngine {
         x: cw * Math.random(),
         y: -5,
         vx: (Math.random() - 0.5) * 0.3,
-        vy: 0.3 + Math.random() * 0.8,
+        vy: (0.3 + Math.random() * 0.8) * spd,
         life: 200 + Math.random() * 200,
         maxLife: 400,
         size: 1 + Math.random() * 2.5,
@@ -964,8 +967,8 @@ export class ParticleEngine {
       this.particles.push({
         x: ep.x + (Math.random() - 0.5) * 6,
         y: ep.y + (Math.random() - 0.5) * 6,
-        vx: ep.nx * (-0.2 - Math.random() * 0.5) + (Math.random() - 0.5) * 0.2,
-        vy: ep.ny * (-0.2 - Math.random() * 0.5) + (Math.random() - 0.5) * 0.2,
+        vx: (ep.nx * (-0.2 - Math.random() * 0.5) + (Math.random() - 0.5) * 0.2) * spd,
+        vy: (ep.ny * (-0.2 - Math.random() * 0.5) + (Math.random() - 0.5) * 0.2) * spd,
         life: 80 + Math.random() * 120,
         maxLife: 200,
         size: 1 + Math.random() * 2,
@@ -1556,7 +1559,7 @@ export class ParticleEngine {
   // ════════════════════════════════════════════════════════════════════
 
   private updateFirework(cw: number, ch: number, sz: number) {
-    this.fireworkTimer += 1;
+    this.fireworkTimer += this.params.speed / 50;
 
     // Spawn new firework burst
     const burstInterval = Math.max(20, 80 - Math.floor(this.params.density / 2));

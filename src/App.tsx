@@ -5,6 +5,8 @@ import EffectControls from './components/EffectControls';
 import PreviewCanvas from './components/PreviewCanvas';
 import { DEFAULT_PARAMS, EFFECT_PRESETS } from './effects/types';
 import type { EffectType, CropShape, EffectParams } from './effects/types';
+// @ts-ignore - gif.js has no types
+import GIF from './lib/gif.js';
 import './App.css';
 
 // Detect browser capabilities
