@@ -258,16 +258,6 @@ const PreviewCanvas: React.FC<Props> = ({ image, gifData, effect, shape, params,
     <div
       ref={containerRef}
       className="preview-canvas"
-      style={{
-        width: SIZE,
-        maxWidth: '100%',
-        aspectRatio: '1 / 1',
-        borderRadius: 16,
-        overflow: 'hidden',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}
     />
   );
 };

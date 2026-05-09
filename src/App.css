@@ -80,7 +80,14 @@
 }
 
 .preview-canvas {
+  width: 512px;
+  max-width: 100%;
+  aspect-ratio: 1 / 1;
   border-radius: 16px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   box-shadow:
     0 0 0 1px rgba(255, 255, 255, 0.06),
     0 20px 60px rgba(0, 0, 0, 0.5);
@@ -453,8 +460,7 @@
   }
 
   .preview-canvas {
-    max-width: 100%;
-    height: auto;
+    max-width: min(85vw, 320px);
   }
 
   .preview-placeholder {
@@ -533,8 +539,8 @@
   }
 
   .preview-canvas {
-    max-width: min(85vw, 320px);
-    max-height: min(85vw, 320px);
+    width: min(85vw, 320px);
+    max-width: none;
   }
 
   .preview-placeholder {
