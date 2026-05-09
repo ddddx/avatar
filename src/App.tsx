@@ -99,7 +99,7 @@ function App() {
       quality: 10,
       width: canvas.width,
       height: canvas.height,
-      workerScript: '/gif.worker.js',
+      workerScript: 'gif.worker.js',
     });
 
     const frameCount = Math.floor((duration / 1000) * fps);

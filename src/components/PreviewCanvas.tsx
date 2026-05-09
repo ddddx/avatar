@@ -158,7 +158,12 @@ const PreviewCanvas: React.FC<Props> = ({ image, effect, shape, params, canvasRe
       }
       initRef.current = false;
     };
-  }, [image, effect, shape, params, canvasRef]);
+  }, [image, effect, shape, canvasRef]);
+
+  // Live-update params (speed, density, intensity, colors) without restarting animation
+  useEffect(() => {
+    engineRef.current.setParams(params);
+  }, [params]);
 
   // Cleanup on unmount
   useEffect(() => {
