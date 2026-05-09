@@ -205,6 +205,20 @@ export class ParticleEngine {
     }
   }
 
+  /** Get a point on a rectangular edge, parameterized by t ∈ [0,1) around the perimeter. */
+  private getSquareEdgePointSimple(cx: number, cy: number, half: number, t: number): { x: number; y: number } {
+    const d = ((t % 1) + 1) % 1;
+    const sideLen = half * 2;
+    const side = Math.floor(d * 4);
+    const frac = (d * 4) % 1;
+    switch (side) {
+      case 0:  return { x: cx - half + frac * sideLen, y: cy - half };
+      case 1:  return { x: cx + half, y: cy - half + frac * sideLen };
+      case 2:  return { x: cx + half - frac * sideLen, y: cy + half };
+      default: return { x: cx - half, y: cy + half - frac * sideLen };
+    }
+  }
+
   // ════════════════════════════════════════════════════════════════════
   // �?LIGHTNING
   // ════════════════════════════════════════════════════════════════════
@@ -2209,7 +2223,6 @@ export class ParticleEngine {
     const cx = cw / 2, cy = ch / 2;
     const time = this.ringTime;
     const ringWidth = 10 + (this.params.intensity / 100) * 30;
-    // Ring center: outer edge = sz/2 (贴边), so center = sz/2 - ringWidth/2
     const r = sz / 2 - ringWidth / 2;
     const steps = 120;
 
@@ -2221,6 +2234,38 @@ export class ParticleEngine {
       '#60a5fa',
       this.params.color,
     ];
+
+    if (this.shape === 'square') {
+      // Rectangular ring: draw gradient segments along 4 sides
+      for (let layer = 1; layer >= 0; layer--) {
+        const layerR = r - layer * 2;
+        const layerWidth = layer === 0 ? ringWidth : ringWidth + 6;
+        const layerAlpha = layer === 0 ? 0.9 : 0.25;
+
+        for (let i = 0; i < steps; i++) {
+          const t = i / steps;
+          const tNext = (i + 1) / steps;
+
+          const colorT = (t + time * 0.3) % 1;
+          const colorIdx = colorT * (rainbowColors.length - 1);
+          const ci = Math.floor(colorIdx);
+          const cf = colorIdx - ci;
+          const color = lerpColor(
+            rainbowColors[ci],
+            rainbowColors[Math.min(ci + 1, rainbowColors.length - 1)],
+            cf
+          );
+
+          const p1 = this.getSquareEdgePointSimple(cx, cy, layerR, t);
+          const p2 = this.getSquareEdgePointSimple(cx, cy, layerR, tNext);
+
+          g.moveTo(p1.x, p1.y);
+          g.lineTo(p2.x, p2.y);
+          g.stroke({ width: layerWidth, color, alpha: layerAlpha, cap: 'round' });
+        }
+      }
+      return;
+    }
 
     // Inner glow (behind the main ring, slightly wider + blurred feel)
     for (let layer = 1; layer >= 0; layer--) {
@@ -2282,6 +2327,33 @@ export class ParticleEngine {
     ];
 
     const ringR = r - lineWidth / 2;
+
+    if (this.shape === 'square') {
+      // Rectangular solid ring with vivid rainbow gradient
+      for (let i = 0; i < steps; i++) {
+        const t = i / steps;
+        const tNext = (i + 1) / steps;
+
+        const colorT = (t + time * 0.3) % 1;
+        const colorIdx = colorT * (rainbowColors.length - 1);
+        const ci = Math.floor(colorIdx);
+        const cf = colorIdx - ci;
+        const segColor = lerpColor(
+          rainbowColors[ci],
+          rainbowColors[Math.min(ci + 1, rainbowColors.length - 1)],
+          cf
+        );
+
+        const p1 = this.getSquareEdgePointSimple(cx, cy, ringR, t);
+        const p2 = this.getSquareEdgePointSimple(cx, cy, ringR, tNext);
+
+        g.moveTo(p1.x, p1.y);
+        g.lineTo(p2.x, p2.y);
+        g.stroke({ width: lineWidth, color: segColor, alpha: 1, cap: 'round' });
+      }
+      return;
+    }
+
     for (let i = 0; i < steps; i++) {
       const t = i / steps;
       const colorT = (t + time * 0.3) % 1;
@@ -2308,12 +2380,21 @@ export class ParticleEngine {
     const r = sz / 2;
     this.discSparkles = [];
     for (let i = 0; i < count; i++) {
-      // distribute with center bias (denser near center, sparse near edge)
-      const dist = Math.sqrt(Math.random());
-      const angle = Math.random() * Math.PI * 2;
+      let x: number, y: number;
+      if (this.shape === 'square') {
+        // Uniform distribution within inner square area
+        x = (Math.random() - 0.5) * r * 1.7;
+        y = (Math.random() - 0.5) * r * 1.7;
+      } else {
+        // distribute with center bias (denser near center, sparse near edge)
+        const dist = Math.sqrt(Math.random());
+        const angle = Math.random() * Math.PI * 2;
+        x = Math.cos(angle) * dist * r * 0.85;
+        y = Math.sin(angle) * dist * r * 0.85;
+      }
       this.discSparkles.push({
-        x: Math.cos(angle) * dist * r * 0.85,
-        y: Math.sin(angle) * dist * r * 0.85,
+        x,
+        y,
         size: 1.5 + Math.random() * 4,
         phase: Math.random() * Math.PI * 2,
         speed: 1.5 + Math.random() * 3,
@@ -2340,28 +2421,54 @@ export class ParticleEngine {
       '#ff0040', '#ff8000', '#ffe000', '#00ff80', '#00b0ff', '#a040ff', '#ff0040',
     ];
     const steps = 120;
-    for (let i = 0; i < steps; i++) {
-      const t = i / steps;
-      const angle1 = t * Math.PI * 2 + this.discAngle;
-      const angle2 = (t + 1 / steps) * Math.PI * 2 + this.discAngle;
 
-      const colorT = t * (discColors.length - 1);
-      const ci = Math.floor(colorT);
-      const cf = colorT - ci;
-      const segColor = lerpColor(
-        discColors[ci],
-        discColors[Math.min(ci + 1, discColors.length - 1)],
-        cf,
-      );
+    if (this.shape === 'square') {
+      // Rectangular disc ring with rotating rainbow gradient
+      for (let i = 0; i < steps; i++) {
+        const t = i / steps;
+        const tNext = (i + 1) / steps;
 
-      const x1 = cx + Math.cos(angle1) * ringR;
-      const y1 = cy + Math.sin(angle1) * ringR;
-      const x2 = cx + Math.cos(angle2) * ringR;
-      const y2 = cy + Math.sin(angle2) * ringR;
+        // Rotate color gradient around the perimeter
+        const colorT = ((t + this.discAngle / (Math.PI * 2)) % 1) * (discColors.length - 1);
+        const ci = Math.floor(colorT);
+        const cf = colorT - ci;
+        const segColor = lerpColor(
+          discColors[ci],
+          discColors[Math.min(ci + 1, discColors.length - 1)],
+          cf,
+        );
 
-      g.moveTo(x1, y1);
-      g.lineTo(x2, y2);
-      g.stroke({ width: ringWidth, color: segColor, alpha: 1, cap: 'round' });
+        const p1 = this.getSquareEdgePointSimple(cx, cy, ringR, t);
+        const p2 = this.getSquareEdgePointSimple(cx, cy, ringR, tNext);
+
+        g.moveTo(p1.x, p1.y);
+        g.lineTo(p2.x, p2.y);
+        g.stroke({ width: ringWidth, color: segColor, alpha: 1, cap: 'round' });
+      }
+    } else {
+      for (let i = 0; i < steps; i++) {
+        const t = i / steps;
+        const angle1 = t * Math.PI * 2 + this.discAngle;
+        const angle2 = (t + 1 / steps) * Math.PI * 2 + this.discAngle;
+
+        const colorT = t * (discColors.length - 1);
+        const ci = Math.floor(colorT);
+        const cf = colorT - ci;
+        const segColor = lerpColor(
+          discColors[ci],
+          discColors[Math.min(ci + 1, discColors.length - 1)],
+          cf,
+        );
+
+        const x1 = cx + Math.cos(angle1) * ringR;
+        const y1 = cy + Math.sin(angle1) * ringR;
+        const x2 = cx + Math.cos(angle2) * ringR;
+        const y2 = cy + Math.sin(angle2) * ringR;
+
+        g.moveTo(x1, y1);
+        g.lineTo(x2, y2);
+        g.stroke({ width: ringWidth, color: segColor, alpha: 1, cap: 'round' });
+      }
     }
 
     // 2. Sparkle/star points on transparent center area
