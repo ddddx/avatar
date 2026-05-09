@@ -5,7 +5,7 @@ import EffectSelector from './components/EffectSelector';
 import EffectControls from './components/EffectControls';
 import PreviewCanvas from './components/PreviewCanvas';
 import { DEFAULT_PARAMS, EFFECT_PRESETS } from './effects/types';
-import type { EffectType, CropShape, EffectParams } from './effects/types';
+import type { EffectType, CropShape, EffectParams, MirrorSettings } from './effects/types';
 // @ts-ignore - gif.js has no types
 import GIF from './lib/gif.js';
 // @ts-ignore - upng-js has no types
@@ -70,6 +70,7 @@ function App() {
   const [gifData, setGifData] = useState<GifData | null>(null);
   const [effect, setEffect] = useState<EffectType>('lightning');
   const [shape, setShape] = useState<CropShape>('circle');
+  const [mirror, setMirror] = useState<MirrorSettings>({ flipX: false, flipY: false });
   const [params, setParams] = useState<EffectParams>({ ...DEFAULT_PARAMS });
   const [exporting, setExporting] = useState(false);
   const [exportFormat, setExportFormat] = useState<'gif' | 'webm' | 'webp' | 'apng'>(
@@ -78,6 +79,13 @@ function App() {
   const [exportProgress, setExportProgress] = useState(0);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const shapeLabel = shape === 'circle' ? '圆形裁切' : '圆角矩形';
+  const mirrorLabel = mirror.flipX && mirror.flipY
+    ? '上下 + 左右'
+    : mirror.flipX
+      ? '左右'
+      : mirror.flipY
+        ? '上下'
+        : '关闭';
   const formatLabel = exportFormat === 'webm'
     ? 'WebM'
     : exportFormat === 'gif'
@@ -396,6 +404,7 @@ function App() {
               <div className="preview-meta">
                 <span className="meta-pill">特效：{EFFECT_LABELS[effect]}</span>
                 <span className="meta-pill">形状：{shapeLabel}</span>
+                <span className="meta-pill">镜像：{mirrorLabel}</span>
                 <span className="meta-pill">导出：{formatLabel}</span>
               </div>
               <div className="preview-stage">
@@ -405,6 +414,7 @@ function App() {
                     gifData={gifData}
                     effect={effect}
                     shape={shape}
+                    mirror={mirror}
                     params={params}
                     canvasRef={canvasRef}
                   />
@@ -460,6 +470,26 @@ function App() {
                     >
                       <span className="shape-icon">⬜</span>
                       <span>矩形</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="output-group">
+                  <div className="group-label">镜像</div>
+                  <div className="mirror-selector">
+                    <button
+                      className={`shape-btn ${mirror.flipX ? 'active' : ''}`}
+                      onClick={() => setMirror((prev) => ({ ...prev, flipX: !prev.flipX }))}
+                    >
+                      <span className="shape-icon">↔</span>
+                      <span>左右镜像</span>
+                    </button>
+                    <button
+                      className={`shape-btn ${mirror.flipY ? 'active' : ''}`}
+                      onClick={() => setMirror((prev) => ({ ...prev, flipY: !prev.flipY }))}
+                    >
+                      <span className="shape-icon">↕</span>
+                      <span>上下镜像</span>
                     </button>
                   </div>
                 </div>

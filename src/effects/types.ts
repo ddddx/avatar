@@ -4,6 +4,11 @@ export type EffectType = 'lightning' | 'fire' | 'glow' | 'orbit' | 'shield' | 'f
 export type CropShape = 'circle' | 'square';
 export const SQUARE_CORNER_RADIUS = 16;
 
+export interface MirrorSettings {
+  flipX: boolean;
+  flipY: boolean;
+}
+
 export interface TrailPoint {
   x: number;
   y: number;
@@ -67,6 +72,7 @@ export interface AvatarState {
   image: HTMLImageElement | null;
   effect: EffectType;
   shape: CropShape;
+  mirror?: MirrorSettings;
   params: EffectParams;
 }
 

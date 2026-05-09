@@ -2,7 +2,7 @@ import React, { useRef, useEffect } from 'react';
 import * as PIXI from 'pixi.js';
 import { ParticleEngine } from '../effects/engine';
 import { SQUARE_CORNER_RADIUS } from '../effects/types';
-import type { EffectType, CropShape, EffectParams } from '../effects/types';
+import type { EffectType, CropShape, EffectParams, MirrorSettings } from '../effects/types';
 import type { GifData } from '../lib/gif-decoder';
 
 interface Props {
@@ -10,13 +10,14 @@ interface Props {
   gifData: GifData | null;
   effect: EffectType;
   shape: CropShape;
+  mirror: MirrorSettings;
   params: EffectParams;
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
 }
 
 const SIZE = 512;
 
-const PreviewCanvas: React.FC<Props> = ({ image, gifData, effect, shape, params, canvasRef }) => {
+const PreviewCanvas: React.FC<Props> = ({ image, gifData, effect, shape, mirror, params, canvasRef }) => {
   const noImageMode = !image && !gifData;
   const containerRef = useRef<HTMLDivElement>(null);
   const appRef = useRef<PIXI.Application | null>(null);
@@ -128,14 +129,14 @@ const PreviewCanvas: React.FC<Props> = ({ image, gifData, effect, shape, params,
           sprite.anchor.set(0.5);
           sprite.position.set(SIZE / 2, SIZE / 2);
           const scale = Math.max(imgSize / gifData.width, imgSize / gifData.height);
-          sprite.scale.set(scale);
+          sprite.scale.set(mirror.flipX ? -scale : scale, mirror.flipY ? -scale : scale);
         } else if (image) {
           const texture = PIXI.Texture.from(image);
           sprite = new PIXI.Sprite(texture);
           sprite.anchor.set(0.5);
           sprite.position.set(SIZE / 2, SIZE / 2);
           const scale = Math.max(imgSize / image.width, imgSize / image.height);
-          sprite.scale.set(scale);
+          sprite.scale.set(mirror.flipX ? -scale : scale, mirror.flipY ? -scale : scale);
         } else {
           return;
         }
@@ -233,7 +234,7 @@ const PreviewCanvas: React.FC<Props> = ({ image, gifData, effect, shape, params,
       }
       initRef.current = false;
     };
-  }, [image, gifData, effect, shape, canvasRef]);
+  }, [image, gifData, effect, shape, mirror, canvasRef]);
 
   // Live-update params (speed, density, intensity, colors) without restarting animation
   useEffect(() => {
