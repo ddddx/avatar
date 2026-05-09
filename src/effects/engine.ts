@@ -2308,7 +2308,7 @@ export class ParticleEngine {
     const r = sz / 2;
     this.discSparkles = [];
     for (let i = 0; i < count; i++) {
-      // distribute with center bias
+      // distribute with center bias (denser near center, sparse near edge)
       const dist = Math.sqrt(Math.random());
       const angle = Math.random() * Math.PI * 2;
       this.discSparkles.push({
@@ -2330,41 +2330,58 @@ export class ParticleEngine {
   private drawDisc(g: PIXI.Graphics, cw: number, ch: number, sz: number) {
     const cx = cw / 2, cy = ch / 2;
     const r = sz / 2;
-    const ringWidth = 4 + (this.params.intensity / 100) * 20;
-    const innerR = r - ringWidth;
-
-    // 1. White fill inside the ring
-    g.circle(cx, cy, innerR);
-    g.fill({ color: 0xffffff, alpha: 1 });
-
-    // 2. Four-color segmented ring (red, blue, green, yellow)
-    const colors = [0xff0040, 0x00b0ff, 0x00ff80, 0xffe000]; // red, blue, green, yellow
+    // Ring width: 15-50px based on intensity
+    const ringWidth = 15 + (this.params.intensity / 100) * 35;
     const ringR = r - ringWidth / 2;
-    for (let i = 0; i < 4; i++) {
-      const startAngle = this.discAngle + (i * Math.PI) / 2;
-      const endAngle = startAngle + Math.PI / 2;
-      g.beginPath();
-      g.arc(cx, cy, ringR, startAngle, endAngle);
-      g.stroke({ width: ringWidth, color: colors[i], alpha: 1 });
+
+    // 1. Continuous rainbow gradient ring (Google One style)
+    // Palette: red → orange → yellow → green → blue → purple → red
+    const discColors = [
+      '#ff0040', '#ff8000', '#ffe000', '#00ff80', '#00b0ff', '#a040ff', '#ff0040',
+    ];
+    const steps = 120;
+    for (let i = 0; i < steps; i++) {
+      const t = i / steps;
+      const angle1 = t * Math.PI * 2 + this.discAngle;
+      const angle2 = (t + 1 / steps) * Math.PI * 2 + this.discAngle;
+
+      const colorT = t * (discColors.length - 1);
+      const ci = Math.floor(colorT);
+      const cf = colorT - ci;
+      const segColor = lerpColor(
+        discColors[ci],
+        discColors[Math.min(ci + 1, discColors.length - 1)],
+        cf,
+      );
+
+      const x1 = cx + Math.cos(angle1) * ringR;
+      const y1 = cy + Math.sin(angle1) * ringR;
+      const x2 = cx + Math.cos(angle2) * ringR;
+      const y2 = cy + Math.sin(angle2) * ringR;
+
+      g.moveTo(x1, y1);
+      g.lineTo(x2, y2);
+      g.stroke({ width: ringWidth, color: segColor, alpha: 1, cap: 'round' });
     }
 
-    // 3. Sparkle points inside
+    // 2. Sparkle/star points on transparent center area
     if (this.discSparkles.length === 0) this.initDiscSparkles(sz);
     const time = this.discAngle * 20; // faster flicker
     for (const sp of this.discSparkles) {
-      const alpha = 0.3 + 0.7 * (0.5 + 0.5 * Math.sin(time * sp.speed + sp.phase));
+      // Alpha pulsing between 0.3 and 0.8
+      const alpha = 0.3 + 0.5 * (0.5 + 0.5 * Math.sin(time * sp.speed + sp.phase));
       const sx = cx + sp.x;
       const sy = cy + sp.y;
       const len = sp.size;
-      // Draw a small cross/star shape
+      // Draw a small cross/star shape in light cyan
       g.beginPath();
       g.moveTo(sx - len, sy);
       g.lineTo(sx + len, sy);
-      g.stroke({ width: 1, color: 0x88ccff, alpha });
+      g.stroke({ width: 1, color: 0x80e0ff, alpha });
       g.beginPath();
       g.moveTo(sx, sy - len);
       g.lineTo(sx, sy + len);
-      g.stroke({ width: 1, color: 0x88ccff, alpha });
+      g.stroke({ width: 1, color: 0x80e0ff, alpha });
     }
   }
 
