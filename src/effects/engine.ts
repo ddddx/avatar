@@ -2233,27 +2233,30 @@ export class ParticleEngine {
     const ringR = r - lineWidth / 2;
 
     if (this.shape === 'square') {
-      // Rectangular solid ring with vivid rainbow gradient (720 segments + overlap to eliminate gaps)
-      for (let i = 0; i < steps; i++) {
-        const t = i / steps;
-        const tOverlap = Math.min((i + 1) / steps + 0.002, 1);
-
-        const colorT = (t + time * 0.3) % 1;
-        const colorIdx = colorT * (rainbowColors.length - 1);
-        const ci = Math.floor(colorIdx);
-        const cf = colorIdx - ci;
-        const segColor = lerpColor(
-          rainbowColors[ci],
-          rainbowColors[Math.min(ci + 1, rainbowColors.length - 1)],
-          cf
-        );
-
-        const p1 = this.getSquareEdgePointSimple(cx, cy, ringR, t);
-        const p2 = this.getSquareEdgePointSimple(cx, cy, ringR, tOverlap);
-
-        g.moveTo(p1.x, p1.y);
-        g.lineTo(p2.x, p2.y);
-        g.stroke({ width: lineWidth, color: segColor, alpha: 1 });
+      // Draw each of the 4 sides independently to avoid corner artifacts.
+      // No segment crosses a corner boundary (t=0.25, 0.5, 0.75, 1.0).
+      const stepsPerSide = steps / 4;
+      for (let side = 0; side < 4; side++) {
+        const sideStart = side / 4;
+        // Draw each segment on this side
+        for (let j = 0; j < stepsPerSide; j++) {
+          const t = sideStart + j / steps;
+          const colorT = (t + time * 0.3) % 1;
+          const colorIdx = colorT * (rainbowColors.length - 1);
+          const ci = Math.floor(colorIdx);
+          const cf = colorIdx - ci;
+          const segColor = lerpColor(
+            rainbowColors[ci],
+            rainbowColors[Math.min(ci + 1, rainbowColors.length - 1)],
+            cf
+          );
+          const p1 = this.getSquareEdgePointSimple(cx, cy, ringR, t);
+          const p2t = sideStart + (j + 1) / steps;
+          const p2 = this.getSquareEdgePointSimple(cx, cy, ringR, p2t);
+          g.moveTo(p1.x, p1.y);
+          g.lineTo(p2.x, p2.y);
+          g.stroke({ width: lineWidth, color: segColor, alpha: 1 });
+        }
       }
       return;
     }
@@ -2299,27 +2302,28 @@ export class ParticleEngine {
     const steps = 720;
 
     if (this.shape === 'square') {
-      // Rectangular disc ring with rotating rainbow gradient (720 segments + overlap to eliminate gaps)
-      for (let i = 0; i < steps; i++) {
-        const t = i / steps;
-        const tOverlap = Math.min((i + 1) / steps + 0.002, 1);
-
-        // Rotate color gradient around the perimeter
-        const colorT = ((t + this.discAngle / (Math.PI * 2)) % 1) * (discColors.length - 1);
-        const ci = Math.floor(colorT);
-        const cf = colorT - ci;
-        const segColor = lerpColor(
-          discColors[ci],
-          discColors[Math.min(ci + 1, discColors.length - 1)],
-          cf,
-        );
-
-        const p1 = this.getSquareEdgePointSimple(cx, cy, ringR, t);
-        const p2 = this.getSquareEdgePointSimple(cx, cy, ringR, tOverlap);
-
-        g.moveTo(p1.x, p1.y);
-        g.lineTo(p2.x, p2.y);
-        g.stroke({ width: ringWidth, color: segColor, alpha: 1 });
+      // Draw each of the 4 sides independently to avoid corner artifacts.
+      // No segment crosses a corner boundary (t=0.25, 0.5, 0.75, 1.0).
+      const stepsPerSide = steps / 4;
+      for (let side = 0; side < 4; side++) {
+        const sideStart = side / 4;
+        for (let j = 0; j < stepsPerSide; j++) {
+          const t = sideStart + j / steps;
+          const colorT = ((t + this.discAngle / (Math.PI * 2)) % 1) * (discColors.length - 1);
+          const ci = Math.floor(colorT);
+          const cf = colorT - ci;
+          const segColor = lerpColor(
+            discColors[ci],
+            discColors[Math.min(ci + 1, discColors.length - 1)],
+            cf,
+          );
+          const p1 = this.getSquareEdgePointSimple(cx, cy, ringR, t);
+          const p2t = sideStart + (j + 1) / steps;
+          const p2 = this.getSquareEdgePointSimple(cx, cy, ringR, p2t);
+          g.moveTo(p1.x, p1.y);
+          g.lineTo(p2.x, p2.y);
+          g.stroke({ width: ringWidth, color: segColor, alpha: 1 });
+        }
       }
     } else {
       for (let i = 0; i < steps; i++) {
