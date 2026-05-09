@@ -204,6 +204,33 @@ export class ParticleEngine {
   // �?LIGHTNING
   // ════════════════════════════════════════════════════════════════════
 
+  // --- Rounded-rect perimeter helper ---
+  private getRoundRectPoint(cx: number, cy: number, half: number, radius: number, t: number): { x: number; y: number } {
+    const r = Math.min(radius, half);
+    const edgeLen = half * 2 - r * 2;
+    const arcLen = (Math.PI / 2) * r;
+    const totalPerim = 4 * edgeLen + 4 * arcLen;
+    t = ((t % 1) + 1) % 1;
+    let d = t * totalPerim;
+
+    if (d < edgeLen) return { x: cx - half + r + d, y: cy - half };
+    d -= edgeLen;
+    if (d < arcLen) { const a = -Math.PI / 2 + d / r; return { x: cx + half - r + Math.cos(a) * r, y: cy - half + r + Math.sin(a) * r }; }
+    d -= arcLen;
+    if (d < edgeLen) return { x: cx + half, y: cy - half + r + d };
+    d -= edgeLen;
+    if (d < arcLen) { const a = d / r; return { x: cx + half - r + Math.cos(a) * r, y: cy + half - r + Math.sin(a) * r }; }
+    d -= arcLen;
+    if (d < edgeLen) return { x: cx + half - r - d, y: cy + half };
+    d -= edgeLen;
+    if (d < arcLen) { const a = Math.PI / 2 + d / r; return { x: cx - half + r + Math.cos(a) * r, y: cy + half - r + Math.sin(a) * r }; }
+    d -= arcLen;
+    if (d < edgeLen) return { x: cx - half, y: cy + half - r - d };
+    d -= edgeLen;
+    if (d < arcLen) { const a = Math.PI + d / r; return { x: cx - half + r + Math.cos(a) * r, y: cy - half + r + Math.sin(a) * r }; }
+
+    return { x: cx - half + r, y: cy - half };
+  }
   private generateBolt(
     x1: number, y1: number, x2: number, y2: number,
     width: number, depth: number, segments: Array<{ x1: number; y1: number; x2: number; y2: number; width: number }>
@@ -2220,38 +2247,24 @@ export class ParticleEngine {
     const ringR = r - lineWidth / 2;
 
     if (this.shape === 'square') {
-      // Draw each of 4 sides with direct linear interpolation.
-      // Corner coordinates are exact (cx±half, cy±half) so no gaps or diagonal lines.
+      const cornerRadius = 16;
       const half = ringR;
-      const sides = [
-        { x1: cx - half, y1: cy - half, x2: cx + half, y2: cy - half }, // top
-        { x1: cx + half, y1: cy - half, x2: cx + half, y2: cy + half }, // right
-        { x1: cx + half, y1: cy + half, x2: cx - half, y2: cy + half }, // bottom
-        { x1: cx - half, y1: cy + half, x2: cx - half, y2: cy - half }, // left
-      ];
-      const stepsPerSide = steps / 4;
-      for (let s = 0; s < 4; s++) {
-        const side = sides[s];
-        for (let i = 0; i < stepsPerSide; i++) {
-          const t = i / stepsPerSide;
-          const globalT = (s * stepsPerSide + i) / steps;
-          const colorT = (globalT + time * 0.3) % 1;
-          const colorIdx = colorT * (rainbowColors.length - 1);
-          const ci = Math.floor(colorIdx);
-          const cf = colorIdx - ci;
-          const segColor = lerpColor(
-            rainbowColors[ci],
-            rainbowColors[Math.min(ci + 1, rainbowColors.length - 1)],
-            cf
-          );
-          const x1 = side.x1 + (side.x2 - side.x1) * t;
-          const y1 = side.y1 + (side.y2 - side.y1) * t;
-          const x2 = side.x1 + (side.x2 - side.x1) * ((i + 1) / stepsPerSide);
-          const y2 = side.y1 + (side.y2 - side.y1) * ((i + 1) / stepsPerSide);
-          g.moveTo(x1, y1);
-          g.lineTo(x2, y2);
-          g.stroke({ width: lineWidth, color: segColor, alpha: 1 });
-        }
+      for (let i = 0; i < steps; i++) {
+        const t = i / steps;
+        const colorT = (t + time * 0.3) % 1;
+        const colorIdx = colorT * (rainbowColors.length - 1);
+        const ci = Math.floor(colorIdx);
+        const cf = colorIdx - ci;
+        const segColor = lerpColor(
+          rainbowColors[ci],
+          rainbowColors[Math.min(ci + 1, rainbowColors.length - 1)],
+          cf
+        );
+        const p1 = this.getRoundRectPoint(cx, cy, half, cornerRadius, t);
+        const p2 = this.getRoundRectPoint(cx, cy, half, cornerRadius, (i + 1) / steps);
+        g.moveTo(p1.x, p1.y);
+        g.lineTo(p2.x, p2.y);
+        g.stroke({ width: lineWidth, color: segColor, alpha: 1 });
       }
       return;
     }
@@ -2297,37 +2310,23 @@ export class ParticleEngine {
     const steps = 720;
 
     if (this.shape === 'square') {
-      // Draw each of 4 sides with direct linear interpolation.
-      // Corner coordinates are exact (cx±half, cy±half) so no gaps or diagonal lines.
+      const cornerRadius = 16;
       const half = ringR;
-      const sides = [
-        { x1: cx - half, y1: cy - half, x2: cx + half, y2: cy - half }, // top
-        { x1: cx + half, y1: cy - half, x2: cx + half, y2: cy + half }, // right
-        { x1: cx + half, y1: cy + half, x2: cx - half, y2: cy + half }, // bottom
-        { x1: cx - half, y1: cy + half, x2: cx - half, y2: cy - half }, // left
-      ];
-      const stepsPerSide = steps / 4;
-      for (let s = 0; s < 4; s++) {
-        const side = sides[s];
-        for (let i = 0; i < stepsPerSide; i++) {
-          const t = i / stepsPerSide;
-          const globalT = (s * stepsPerSide + i) / steps;
-          const colorT = ((globalT + this.discAngle / (Math.PI * 2)) % 1) * (discColors.length - 1);
-          const ci = Math.floor(colorT);
-          const cf = colorT - ci;
-          const segColor = lerpColor(
-            discColors[ci],
-            discColors[Math.min(ci + 1, discColors.length - 1)],
-            cf,
-          );
-          const x1 = side.x1 + (side.x2 - side.x1) * t;
-          const y1 = side.y1 + (side.y2 - side.y1) * t;
-          const x2 = side.x1 + (side.x2 - side.x1) * ((i + 1) / stepsPerSide);
-          const y2 = side.y1 + (side.y2 - side.y1) * ((i + 1) / stepsPerSide);
-          g.moveTo(x1, y1);
-          g.lineTo(x2, y2);
-          g.stroke({ width: ringWidth, color: segColor, alpha: 1 });
-        }
+      for (let i = 0; i < steps; i++) {
+        const t = i / steps;
+        const colorT = ((t + this.discAngle / (Math.PI * 2)) % 1) * (discColors.length - 1);
+        const ci = Math.floor(colorT);
+        const cf = colorT - ci;
+        const segColor = lerpColor(
+          discColors[ci],
+          discColors[Math.min(ci + 1, discColors.length - 1)],
+          cf,
+        );
+        const p1 = this.getRoundRectPoint(cx, cy, half, cornerRadius, t);
+        const p2 = this.getRoundRectPoint(cx, cy, half, cornerRadius, (i + 1) / steps);
+        g.moveTo(p1.x, p1.y);
+        g.lineTo(p2.x, p2.y);
+        g.stroke({ width: ringWidth, color: segColor, alpha: 1 });
       }
     } else {
       for (let i = 0; i < steps; i++) {

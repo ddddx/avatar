@@ -144,7 +144,7 @@ const PreviewCanvas: React.FC<Props> = ({ image, gifData, effect, shape, params,
         if (shape === 'circle') {
           mask.circle(SIZE / 2, SIZE / 2, SIZE / 2).fill({ color: 0xffffff });
         } else {
-          mask.rect(0, 0, SIZE, SIZE).fill({ color: 0xffffff });
+          mask.roundRect(0, 0, SIZE, SIZE, 16).fill({ color: 0xffffff });
         }
         app.stage.addChild(mask);
         maskRef.current = mask;
