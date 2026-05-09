@@ -103,7 +103,7 @@ function App() {
       width: canvas.width,
       height: canvas.height,
       workerScript: import.meta.env.BASE_URL + 'gif.worker.js',
-      transparent: noImageMode ? 0x010101 : undefined,
+      transparent: noImageMode ? 0x000000 : undefined,
     });
 
     const frameCount = Math.floor((duration / 1000) * fps);
