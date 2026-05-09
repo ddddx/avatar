@@ -93,9 +93,15 @@ export class ParticleEngine {
   // Bubble state
   private bubbleTime = 0;
 
-  // Pulse state
-  private pulseRings: Array<{ radius: number; alpha: number; speed: number }> = [];
-  private pulseTimer = 0;
+  // Aurora state
+  private auroraTime = 0;
+
+
+  // Firefly state
+  private fireflyTime = 0;
+
+  // Rain state
+  private rainTime = 0;
 
   setEffect(e: EffectType) { this.effect = e; this.particles = []; this.lightningBolts = []; }
   setShape(s: CropShape) { this.shape = s; }
@@ -123,7 +129,9 @@ export class ParticleEngine {
       case 'loader':    this.updateLoader(canvasW, canvasH, imgSize); break;
       case 'matrix':    this.updateMatrix(canvasW, canvasH, imgSize); break;
       case 'bubble':    this.updateBubble(canvasW, canvasH, imgSize); break;
-      case 'pulse':     this.updatePulse(canvasW, canvasH, imgSize); break;
+      case 'aurora':    this.updateAurora(canvasW, canvasH, imgSize); break;
+      case 'firefly':   this.updateFirefly(canvasW, canvasH, imgSize); break;
+      case 'rain':      this.updateRain(canvasW, canvasH, imgSize); break;
     }
   }
 
@@ -147,7 +155,9 @@ export class ParticleEngine {
       case 'loader':    this.drawLoader(g, canvasW, canvasH, imgSize); break;
       case 'matrix':    this.drawMatrix(g, canvasW, canvasH, imgSize); break;
       case 'bubble':    this.drawBubble(g, canvasW, canvasH, imgSize); break;
-      case 'pulse':     this.drawPulse(g, canvasW, canvasH, imgSize); break;
+      case 'aurora':    this.drawAurora(g, canvasW, canvasH, imgSize); break;
+      case 'firefly':   this.drawFirefly(g, canvasW, canvasH, imgSize); break;
+      case 'rain':      this.drawRain(g, canvasW, canvasH, imgSize); break;
     }
   }
 
@@ -180,7 +190,7 @@ export class ParticleEngine {
   }
 
   // ════════════════════════════════════════════════════════════════════
-  // ⚡ LIGHTNING
+  // �?LIGHTNING
   // ════════════════════════════════════════════════════════════════════
 
   private generateBolt(
@@ -302,7 +312,7 @@ export class ParticleEngine {
       const flashAlpha = progress > 0.7 ? 1 : 0.6 + Math.sin(progress * Math.PI * 8) * 0.4;
       const baseAlpha = fadeAlpha * flashAlpha * bolt.glow;
 
-      // 3-layer glow: outer (thick, low alpha) → mid → core (thin, high alpha)
+      // 3-layer glow: outer (thick, low alpha) �?mid �?core (thin, high alpha)
       const layers = [
         { width: 4, color: 0x4488ff, alpha: baseAlpha * 0.35 },
         { width: 2, color: 0x88bbff, alpha: baseAlpha * 0.65 },
@@ -372,19 +382,19 @@ export class ParticleEngine {
   private updateFire(cw: number, ch: number, sz: number) {
     const spawnRate = Math.floor(this.params.density / 3) + 3;
     const ext = (this.params.intensity / 100);
+    const cx = cw / 2, cy = ch / 2, r = sz / 2;
 
     for (let i = 0; i < spawnRate; i++) {
-      const t = Math.random();
-      const ep = this.getEdgePoint(cw, ch, sz, t);
-
-      const spreadDir = Math.random() < 0.6 ? 1 : -1;
-      const speed = 0.5 + Math.random() * 2 * ext;
+      // Fire rises from the bottom area
+      const spreadX = (Math.random() - 0.5) * r * 0.6;
+      const baseX = cx + spreadX;
+      const baseY = cy + r * 0.7 + Math.random() * r * 0.2;
 
       this.particles.push({
-        x: ep.x + (Math.random() - 0.5) * 4,
-        y: ep.y + (Math.random() - 0.5) * 4,
-        vx: ep.nx * speed * spreadDir + (Math.random() - 0.5) * 0.5,
-        vy: ep.ny * speed * spreadDir + (Math.random() - 0.5) * 0.5 - 0.3,
+        x: baseX + (Math.random() - 0.5) * 6,
+        y: baseY,
+        vx: (Math.random() - 0.5) * 0.8,
+        vy: -(1 + Math.random() * 2 * ext),
         life: 25 + Math.random() * 35,
         maxLife: 60,
         size: 3 + Math.random() * (5 + ext * 8),
@@ -471,7 +481,7 @@ export class ParticleEngine {
   }
 
   // ════════════════════════════════════════════════════════════════════
-  // ✨ GLOW
+  // �?GLOW
   // ════════════════════════════════════════════════════════════════════
 
   private updateGlow(cw: number, ch: number, sz: number) {
@@ -1196,7 +1206,7 @@ export class ParticleEngine {
   }
 
   // ════════════════════════════════════════════════════════════════════
-  // ⭐ STARDUST
+  // �?STARDUST
   // ════════════════════════════════════════════════════════════════════
 
   private updateStardust(cw: number, ch: number, sz: number) {
@@ -1423,7 +1433,7 @@ export class ParticleEngine {
   }
 
   // ════════════════════════════════════════════════════════════════════
-  // 🌪️ VORTEX
+  // 🌪�?VORTEX
   // ════════════════════════════════════════════════════════════════════
 
   private updateVortex(cw: number, ch: number, sz: number) {
@@ -1649,7 +1659,7 @@ export class ParticleEngine {
   }
 
   // ════════════════════════════════════════════════════════════════════
-  // ✨ GOLD
+  // �?GOLD
   // ════════════════════════════════════════════════════════════════════
 
   private updateGold(cw: number, ch: number, _sz: number) {
@@ -1785,7 +1795,7 @@ export class ParticleEngine {
   }
 
   // ════════════════════════════════════════════════════════════════════
-  // ⏳ LOADER
+  // �?LOADER
   // ════════════════════════════════════════════════════════════════════
 
   private updateLoader(cw: number, ch: number, sz: number) {
@@ -1927,11 +1937,14 @@ export class ParticleEngine {
         const fadeT = i / visibleChars;
         const alpha = isHead ? 1 : Math.max(0, 0.8 - fadeT * 0.7);
         const color = isHead ? 0xffffff : (fadeT < 0.3 ? greenNum : darkGreenNum);
-        // Use a simple rect as placeholder for character
-        g.rect(col.x - 3, y - 5, 6, 10).fill({ color, alpha: alpha * 0.8 });
-        // Glow on head
+        // Varying character sizes for visual interest
+        const charW = 4 + (col.chars[i]?.charCodeAt(0) % 3) * 1.5;
+        const charH2 = 8 + (col.chars[i]?.charCodeAt(0) % 4) * 2;
+        g.rect(col.x - charW / 2, y - charH2 / 2, charW, charH2).fill({ color, alpha: alpha * 0.8 });
+        // Bright head with glow
         if (isHead) {
-          g.circle(col.x, y, 6).fill({ color: greenNum, alpha: 0.3 });
+          g.circle(col.x, y, 8).fill({ color: greenNum, alpha: 0.25 });
+          g.circle(col.x, y, 4).fill({ color: 0xffffff, alpha: 0.8 });
         }
       }
     }
@@ -2001,56 +2014,170 @@ export class ParticleEngine {
   }
 
   // ════════════════════════════════════════════════════════════════════
-  // 📡 PULSE
+    // ════════════════════════════════════════════════════════════════════
+  // AURORA
   // ════════════════════════════════════════════════════════════════════
 
-  private updatePulse(_cw: number, _ch: number, sz: number) {
-    this.pulseTimer += 0.016 * (this.params.speed / 50);
+  private updateAurora(cw: number, ch: number, sz: number) {
+    this.auroraTime += 0.016 * (this.params.speed / 50);
+    const targetCount = Math.floor(this.params.density * 1.5) + 30;
 
-    // Spawn new rings periodically
-    const spawnInterval = 40 / (this.params.speed / 50);
-    if (Math.floor(this.pulseTimer * 60) % Math.floor(spawnInterval) === 0 && this.pulseRings.length < 8) {
-      this.pulseRings.push({
-        radius: sz * 0.05,
-        alpha: 0.8,
-        speed: 1 + (this.params.intensity / 100) * 2,
+    while (this.particles.length < targetCount) {
+      this.particles.push({
+        x: Math.random() * cw,
+        y: ch / 2 - sz / 2 + Math.random() * sz * 0.4,
+        vx: 0, vy: 0,
+        life: 300 + Math.random() * 500,
+        maxLife: 800,
+        size: 20 + Math.random() * 40,
+        color: Math.random() > 0.5 ? this.params.color : this.params.secondaryColor,
+        alpha: 0.05 + Math.random() * 0.1,
+        swayPhase: Math.random() * Math.PI * 2,
+        swaySpeed: 0.3 + Math.random() * 0.7,
       });
     }
 
-    this.pulseRings = this.pulseRings.filter(ring => {
-      ring.radius += ring.speed;
-      ring.alpha -= 0.008;
-      return ring.alpha > 0 && ring.radius < sz * 0.6;
+    this.particles = this.particles.filter(p => {
+      p.x += Math.sin(this.auroraTime * (p.swaySpeed ?? 0.5) + (p.swayPhase ?? 0)) * 1.5;
+      p.y += Math.sin(this.auroraTime * 0.3 + (p.swayPhase ?? 0)) * 0.3;
+      p.alpha = (0.05 + 0.08 * Math.sin(this.auroraTime * 2 + (p.swayPhase ?? 0))) * (p.life / (p.maxLife ?? 800));
+      p.life -= 1;
+      return p.life > 0;
     });
   }
 
-  private drawPulse(g: PIXI.Graphics, cw: number, ch: number, sz: number) {
-    const cx = cw / 2, cy = ch / 2;
-    const colorNum = hexToNum(this.params.color);
+  private drawAurora(g: PIXI.Graphics, _cw: number, _ch: number, _sz: number) {
+    for (const p of this.particles) {
+      const pColor = hexToNum(p.color);
+      g.ellipse(p.x, p.y, p.size, p.size * 0.3).fill({ color: pColor, alpha: p.alpha });
+    }
+  }
 
-    // Center dot
-    g.circle(cx, cy, 4).fill({ color: colorNum, alpha: 0.8 });
-    g.circle(cx, cy, 8).fill({ color: colorNum, alpha: 0.15 });
+  // ════════════════════════════════════════════════════════════════════
+  // FIREFLY
+  // ════════════════════════════════════════════════════════════════════
 
-    // Rings
-    for (const ring of this.pulseRings) {
-      const t = ring.radius / (sz * 0.6);
-      const color = lerpColor(this.params.color, this.params.secondaryColor, t);
-      g.circle(cx, cy, ring.radius).stroke({
-        color,
-        alpha: ring.alpha,
-        width: 2 + (1 - t) * 2,
+  private updateFirefly(cw: number, ch: number, sz: number) {
+    this.fireflyTime += 0.016 * (this.params.speed / 50);
+    const cx = cw / 2, cy = ch / 2, r = sz / 2;
+    const targetCount = Math.floor(this.params.density * 0.8) + 15;
+
+    while (this.particles.length < targetCount) {
+      const angle = Math.random() * Math.PI * 2;
+      const dist = Math.random() * r * 0.85;
+      this.particles.push({
+        x: cx + Math.cos(angle) * dist,
+        y: cy + Math.sin(angle) * dist,
+        vx: (Math.random() - 0.5) * 0.3,
+        vy: (Math.random() - 0.5) * 0.3,
+        life: 400 + Math.random() * 600,
+        maxLife: 1000,
+        size: 2 + Math.random() * 3,
+        color: Math.random() > 0.4 ? this.params.color : this.params.secondaryColor,
+        alpha: 0,
+        flickerSpeed: 1 + Math.random() * 3,
+        flickerPhase: Math.random() * Math.PI * 2,
+        swayPhase: Math.random() * Math.PI * 2,
+        swaySpeed: 0.5 + Math.random() * 1.5,
       });
     }
 
-    // Radar sweep line
-    const sweepAngle = this.pulseTimer * 3;
-    const sweepLen = sz * 0.45;
-    g.moveTo(cx, cy)
-      .lineTo(cx + Math.cos(sweepAngle) * sweepLen, cy + Math.sin(sweepAngle) * sweepLen)
-      .stroke({ color: colorNum, alpha: 0.3, width: 1.5 });
+    this.particles = this.particles.filter(p => {
+      p.vx += (Math.random() - 0.5) * 0.05;
+      p.vy += (Math.random() - 0.5) * 0.05;
+      p.vx *= 0.98;
+      p.vy *= 0.98;
+      p.x += p.vx + Math.sin(this.fireflyTime * (p.swaySpeed ?? 1) + (p.swayPhase ?? 0)) * 0.2;
+      p.y += p.vy + Math.cos(this.fireflyTime * (p.swaySpeed ?? 1) + (p.swayPhase ?? 0)) * 0.15;
+
+      const dx = p.x - cx, dy = p.y - cy;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist > r * 0.9) {
+        p.vx -= dx * 0.001;
+        p.vy -= dy * 0.001;
+      }
+
+      const flicker = 0.3 + 0.7 * Math.abs(Math.sin(this.fireflyTime * (p.flickerSpeed ?? 2) + (p.flickerPhase ?? 0)));
+      const lifeRatio = p.life / (p.maxLife ?? 1000);
+      const fadeIn = lifeRatio > 0.9 ? (1 - lifeRatio) / 0.1 : 1;
+      const fadeOut = lifeRatio < 0.1 ? lifeRatio / 0.1 : 1;
+      p.alpha = flicker * fadeIn * fadeOut;
+
+      p.life -= 1;
+      return p.life > 0;
+    });
   }
 
+  private drawFirefly(g: PIXI.Graphics, _cw: number, _ch: number, _sz: number) {
+    for (const p of this.particles) {
+      const pColor = hexToNum(p.color);
+      g.circle(p.x, p.y, p.size * 4).fill({ color: pColor, alpha: p.alpha * 0.08 });
+      g.circle(p.x, p.y, p.size * 2).fill({ color: pColor, alpha: p.alpha * 0.2 });
+      g.circle(p.x, p.y, p.size).fill({ color: pColor, alpha: p.alpha * 0.7 });
+      g.circle(p.x, p.y, p.size * 0.3).fill({ color: 0xffffff, alpha: p.alpha * 0.9 });
+    }
+  }
+
+  // ════════════════════════════════════════════════════════════════════
+  // RAIN
+  // ════════════════════════════════════════════════════════════════════
+
+  private updateRain(cw: number, ch: number, sz: number) {
+    this.rainTime += 0.016 * (this.params.speed / 50);
+    const cx = cw / 2, cy = ch / 2, r = sz / 2;
+    const targetCount = Math.floor(this.params.density * 2) + 40;
+
+    while (this.particles.length < targetCount) {
+      const angle = Math.random() * Math.PI * 2;
+      const dist = Math.random() * r * 0.9;
+      this.particles.push({
+        x: cx + Math.cos(angle) * dist,
+        y: cy - r + Math.random() * r * 0.3,
+        vx: (Math.random() - 0.5) * 0.3,
+        vy: 3 + Math.random() * 4,
+        life: 60 + Math.random() * 80,
+        maxLife: 140,
+        size: 1 + Math.random() * 1.5,
+        color: Math.random() > 0.3 ? this.params.color : this.params.secondaryColor,
+        alpha: 0.4 + Math.random() * 0.4,
+        trail: [],
+      });
+    }
+
+    this.particles = this.particles.filter(p => {
+      if (p.trail) {
+        p.trail.push({ x: p.x, y: p.y, alpha: p.alpha, size: p.size });
+        if (p.trail.length > 4) p.trail.shift();
+      }
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vy += 0.05;
+
+      if (this.shape === 'circle') {
+        const dx = p.x - cx, dy = p.y - cy;
+        if (dx * dx + dy * dy > r * r) {
+          p.life = 0;
+        }
+      }
+
+      p.life -= 1;
+      return p.life > 0 && p.y < ch + 10;
+    });
+  }
+
+  private drawRain(g: PIXI.Graphics, _cw: number, _ch: number, _sz: number) {
+    for (const p of this.particles) {
+      const lifeRatio = p.life / (p.maxLife ?? 140);
+      const a = p.alpha * Math.min(1, lifeRatio * 3);
+      const pColor = hexToNum(p.color);
+
+      g.moveTo(p.x, p.y);
+      g.lineTo(p.x - p.vx * 0.5, p.y - p.vy * 0.5);
+      g.stroke({ color: pColor, alpha: a, width: p.size });
+
+      g.circle(p.x, p.y, p.size * 2).fill({ color: pColor, alpha: a * 0.15 });
+    }
+  }
   clear() {
     this.particles = [];
     this.lightningBolts = [];
@@ -2076,7 +2203,9 @@ export class ParticleEngine {
     this.matrixColumns = [];
     this.matrixTimer = 0;
     this.bubbleTime = 0;
-    this.pulseRings = [];
-    this.pulseTimer = 0;
+    this.auroraTime = 0;
+
+    this.fireflyTime = 0;
+    this.rainTime = 0;
   }
 }

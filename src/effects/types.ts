@@ -1,6 +1,6 @@
 import type { Application, Container, Graphics } from 'pixi.js';
 
-export type EffectType = 'lightning' | 'fire' | 'glow' | 'orbit' | 'shield' | 'frost' | 'ripple' | 'petal' | 'stardust' | 'prism' | 'vortex' | 'firework' | 'gold' | 'spin' | 'loader' | 'matrix' | 'bubble' | 'pulse';
+export type EffectType = 'lightning' | 'fire' | 'glow' | 'orbit' | 'shield' | 'frost' | 'ripple' | 'petal' | 'stardust' | 'prism' | 'vortex' | 'firework' | 'gold' | 'spin' | 'loader' | 'matrix' | 'bubble' | 'aurora' | 'firefly' | 'rain';
 export type CropShape = 'circle' | 'square';
 
 export interface TrailPoint {
@@ -101,5 +101,7 @@ export const EFFECT_PRESETS: Record<EffectType, Partial<EffectParams>> = {
   loader:    { color: '#60a5fa', secondaryColor: '#a78bfa', density: 30, intensity: 50, speed: 50 },
   matrix:    { color: '#22c55e', secondaryColor: '#16a34a', density: 60, intensity: 65, speed: 45 },
   bubble:    { color: '#67e8f9', secondaryColor: '#a5f3fc', density: 55, intensity: 55, speed: 40 },
-  pulse:     { color: '#f472b6', secondaryColor: '#c084fc', density: 40, intensity: 70, speed: 50 },
+  aurora:    { color: '#22d3ee', secondaryColor: '#a78bfa', density: 50, intensity: 60, speed: 35 },
+  firefly:   { color: '#fbbf24', secondaryColor: '#34d399', density: 55, intensity: 50, speed: 30 },
+  rain:      { color: '#60a5fa', secondaryColor: '#93c5fd', density: 60, intensity: 55, speed: 55 },
 };

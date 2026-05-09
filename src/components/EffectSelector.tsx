@@ -24,7 +24,9 @@ const effects: { type: EffectType; icon: string; label: string }[] = [
   { type: 'loader',    icon: '⏳', label: '加载中' },
   { type: 'matrix',    icon: '🟢', label: '矩阵雨' },
   { type: 'bubble',    icon: '🫧', label: '气泡' },
-  { type: 'pulse',     icon: '📡', label: '脉冲环' },
+  { type: 'aurora',    icon: '🌌', label: '极光' },
+  { type: 'firefly',   icon: '🪲', label: '萤火虫' },
+  { type: 'rain',      icon: '🌧️', label: '雨' },
 ];
 
 const EffectSelector: React.FC<Props> = ({ selected, onChange }) => {
