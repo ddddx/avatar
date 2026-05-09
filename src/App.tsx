@@ -103,16 +103,33 @@ function App() {
       width: canvas.width,
       height: canvas.height,
       workerScript: import.meta.env.BASE_URL + 'gif.worker.js',
-      transparent: noImageMode ? 0x000000 : undefined,
+      transparent: noImageMode ? 0xff00ff : undefined,
     });
 
     const frameCount = Math.floor((duration / 1000) * fps);
     const frameDelay = Math.round(1000 / fps);
 
+    // For no-image mode: create offscreen canvas with magenta background
+    let offscreen: HTMLCanvasElement | null = null;
+    let offCtx: CanvasRenderingContext2D | null = null;
+    if (noImageMode) {
+      offscreen = document.createElement('canvas');
+      offscreen.width = canvas.width;
+      offscreen.height = canvas.height;
+      offCtx = offscreen.getContext('2d')!;
+    }
+
     // Capture frames
     for (let i = 0; i < frameCount; i++) {
-      gif.addFrame(canvas, { copy: true, delay: frameDelay });
-      setExportProgress((i + 1) / frameCount * 0.5); // 0-50% for capture
+      if (noImageMode && offscreen && offCtx) {
+        offCtx.fillStyle = '#ff00ff';
+        offCtx.fillRect(0, 0, offscreen.width, offscreen.height);
+        offCtx.drawImage(canvas, 0, 0);
+        gif.addFrame(offscreen, { copy: true, delay: frameDelay });
+      } else {
+        gif.addFrame(canvas, { copy: true, delay: frameDelay });
+      }
+      setExportProgress((i + 1) / frameCount * 0.5);
       await new Promise(r => setTimeout(r, frameDelay));
     }
 
