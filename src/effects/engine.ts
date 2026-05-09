@@ -1811,7 +1811,7 @@ export class ParticleEngine {
 
     // Loader dots orbit and pulse
     const mainAngle = this.loaderTime * 3;
-    this.particles.forEach((p, i) => {
+    this.particles.forEach((p) => {
       const idx = p.orbitLayer ?? 0;
       const phase = mainAngle - (idx / dotCount) * Math.PI * 0.5;
       // Ease in/out for each dot
@@ -1830,7 +1830,6 @@ export class ParticleEngine {
   private drawLoader(g: PIXI.Graphics, cw: number, ch: number, sz: number) {
     const cx = cw / 2, cy = ch / 2;
     const colorNum = hexToNum(this.params.color);
-    const secColorNum = hexToNum(this.params.secondaryColor);
 
     // Center pulsing circle
     const breathe = 0.06 + 0.04 * Math.sin(this.loaderTime * 4);
@@ -1855,7 +1854,7 @@ export class ParticleEngine {
   // 🟢 MATRIX
   // ════════════════════════════════════════════════════════════════════
 
-  private updateMatrix(cw: number, ch: number, sz: number) {
+  private updateMatrix(cw: number, _ch: number, sz: number) {
     this.matrixTimer += 0.016 * (this.params.speed / 50);
     const colWidth = 12;
     const colCount = Math.floor(sz / colWidth);
@@ -1943,7 +1942,6 @@ export class ParticleEngine {
       // Sway
       p.x += Math.sin(this.bubbleTime * (p.swaySpeed ?? 1) + (p.swayPhase ?? 0)) * 0.5;
       // Slight shrink as it rises
-      const lifeRatio = p.life / p.maxLife;
       p.size *= 0.9995;
       p.life -= 1;
       // Pop near top
@@ -1951,8 +1949,7 @@ export class ParticleEngine {
     });
   }
 
-  private drawBubble(g: PIXI.Graphics, cw: number, ch: number, sz: number) {
-    const cx = cw / 2, cy = ch / 2, r = sz / 2;
+  private drawBubble(g: PIXI.Graphics, _cw: number, _ch: number, _sz: number) {
 
     for (const p of this.particles) {
       const lifeRatio = p.life / p.maxLife;
@@ -1972,9 +1969,8 @@ export class ParticleEngine {
   // 📡 PULSE
   // ════════════════════════════════════════════════════════════════════
 
-  private updatePulse(cw: number, ch: number, sz: number) {
+  private updatePulse(_cw: number, _ch: number, sz: number) {
     this.pulseTimer += 0.016 * (this.params.speed / 50);
-    const cx = cw / 2, cy = ch / 2;
 
     // Spawn new rings periodically
     const spawnInterval = 40 / (this.params.speed / 50);
@@ -1996,7 +1992,6 @@ export class ParticleEngine {
   private drawPulse(g: PIXI.Graphics, cw: number, ch: number, sz: number) {
     const cx = cw / 2, cy = ch / 2;
     const colorNum = hexToNum(this.params.color);
-    const secColorNum = hexToNum(this.params.secondaryColor);
 
     // Center dot
     g.circle(cx, cy, 4).fill({ color: colorNum, alpha: 0.8 });
