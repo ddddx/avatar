@@ -7,6 +7,8 @@ interface Props {
 }
 
 const effects: { type: EffectType; icon: string; label: string }[] = [
+  { type: 'solidring', icon: '⭕', label: '实心环' },
+  { type: 'disc',      icon: '💿', label: '光盘' },
   { type: 'lightning', icon: '⚡', label: '闪电' },
   { type: 'fire',      icon: '🔥', label: '火焰' },
   { type: 'glow',      icon: '✨', label: '炫光' },
@@ -27,8 +29,6 @@ const effects: { type: EffectType; icon: string; label: string }[] = [
   { type: 'aurora',    icon: '🌌', label: '极光' },
   { type: 'firefly',   icon: '🪲', label: '萤火虫' },
   { type: 'rain',      icon: '🌧️', label: '雨' },
-  { type: 'solidring', icon: '⭕', label: '实心环' },
-  { type: 'disc',     icon: '💿', label: '光盘' },
 ];
 
 const EffectSelector: React.FC<Props> = ({ selected, onChange }) => {

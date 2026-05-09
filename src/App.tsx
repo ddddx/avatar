@@ -18,6 +18,30 @@ import './App.css';
 const supportsMediaRecorder = typeof MediaRecorder !== 'undefined';
 const supportsWebWorkers = typeof Worker !== 'undefined';
 const GIF_TRANSPARENT_KEY = 0xff00ff;
+const EFFECT_LABELS: Record<EffectType, string> = {
+  solidring: '实心环',
+  disc: '光盘',
+  lightning: '闪电',
+  fire: '火焰',
+  glow: '炫光',
+  orbit: '环形粒子',
+  shield: '能量护盾',
+  frost: '冰霜',
+  ripple: '水波纹',
+  petal: '花瓣雨',
+  stardust: '星尘',
+  prism: '棱镜光',
+  vortex: '旋风',
+  firework: '烟花',
+  gold: '金粉',
+  spin: '旋转',
+  loader: '加载中',
+  matrix: '矩阵雨',
+  bubble: '气泡',
+  aurora: '极光',
+  firefly: '萤火虫',
+  rain: '雨',
+};
 
 function applyCircleAlphaMask(ctx: CanvasRenderingContext2D, w: number, h: number) {
   ctx.save();
@@ -53,6 +77,14 @@ function App() {
   );
   const [exportProgress, setExportProgress] = useState(0);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const shapeLabel = shape === 'circle' ? '圆形裁切' : '圆角矩形';
+  const formatLabel = exportFormat === 'webm'
+    ? 'WebM'
+    : exportFormat === 'gif'
+      ? 'GIF'
+      : exportFormat === 'apng'
+        ? 'APNG'
+        : 'WebP';
 
   const handleImageLoad = useCallback((img: HTMLImageElement) => {
     setImage(img);
@@ -329,115 +361,168 @@ function App() {
   return (
     <div className="app">
       <header className="app-header">
-        <h1>✨ Avatar FX Studio</h1>
-        <p className="subtitle">动态头像粒子特效生成器</p>
+        <p className="eyebrow">Avatar Motion Lab</p>
+        <h1>动态头像工作台</h1>
+        <p className="subtitle">上传图片或 GIF，套用动态特效，导出支持透明背景的头像动画。</p>
+        <div className="header-badges">
+          <span className="meta-pill">22 种特效</span>
+          <span className="meta-pill">圆外透明导出</span>
+          <span className="meta-pill">GIF / APNG / WebP / WebM</span>
+        </div>
       </header>
 
       <main className="app-main">
-        {/* Top: Effect selector */}
-        <div className="sidebar">
-          <section className="panel">
+        <section className="panel selector-shell">
+          <div className="section-head section-head-inline">
+            <div>
+              <p className="section-kicker">Effects</p>
+              <h2 className="section-title">特效库</h2>
+            </div>
+            <p className="section-note">先选风格，再微调密度、速度和颜色。当前特效：{EFFECT_LABELS[effect]}</p>
+          </div>
+          <div className="selector-body">
             <EffectSelector selected={effect} onChange={handleEffectChange} />
-          </section>
-        </div>
+          </div>
 
-        {/* Center: Preview */}
-        <div className="preview-area">
-          {
-            <PreviewCanvas
-              image={image}
-              gifData={gifData}
-              effect={effect}
-              shape={shape}
-              params={params}
-              canvasRef={canvasRef}
-            />
-          }
-        </div>
-
-        {/* Bottom: Controls bar */}
-        <div className="bottom-bar">
-          <section className="panel">
-            <ImageUploader onImageLoad={handleImageLoad} onGifLoad={handleGifLoad} />
-          </section>
-
-          <section className="panel">
-            <EffectControls params={params} onChange={setParams} />
-          </section>
-
-          <section className="panel">
-            <div className="shape-selector">
-              <button
-                className={`shape-btn ${shape === 'circle' ? 'active' : ''}`}
-                onClick={() => setShape('circle')}
-              >
-                ⭕
-              </button>
-              <button
-                className={`shape-btn ${shape === 'square' ? 'active' : ''}`}
-                onClick={() => setShape('square')}
-              >
-                ⬜
-              </button>
-            </div>
-          </section>
-
-          <section className="panel">
-            <div className="export-controls">
-              <div className="format-toggle">
-                <button
-                  className={`format-btn ${exportFormat === 'webm' ? 'active' : ''}`}
-                  onClick={() => setExportFormat('webm')}
-                  disabled={!supportsMediaRecorder}
-                  title="WebM 视频，支持半透明"
-                >
-                  🎬 WebM
-                </button>
-                <button
-                  className={`format-btn ${exportFormat === 'gif' ? 'active' : ''}`}
-                  onClick={() => setExportFormat('gif')}
-                  disabled={!supportsWebWorkers}
-                  title="GIF 动图，不支持半透明"
-                >
-                  🖼️ GIF
-                </button>
-                <button
-                  className={`format-btn ${exportFormat === 'apng' ? 'active' : ''}`}
-                  onClick={() => setExportFormat('apng')}
-                  title="动画PNG，支持完整半透明"
-                >
-                  🎞️ APNG
-                </button>
-                <button
-                  className={`format-btn ${exportFormat === 'webp' ? 'active' : ''}`}
-                  onClick={() => setExportFormat('webp')}
-                  title="动画 WebP，支持半透明（Chrome/Edge）"
-                >
-                  🎬 WebP
-                </button>
-
-              </div>
-              {exporting && (
-                <div className="export-progress">
-                  <div
-                    className="export-progress-bar"
-                    style={{ width: `${Math.round(exportProgress * 100)}%` }}
-                  />
-                  <span className="export-progress-text">
-                    {Math.round(exportProgress * 100)}%
-                  </span>
+          <div className="studio-grid">
+            <section className="panel preview-panel">
+              <div className="section-head">
+                <div>
+                  <p className="section-kicker">Preview</p>
+                  <h2 className="section-title">实时预览</h2>
                 </div>
-              )}
-              <button
-                className="export-btn"
-                onClick={handleExport}
-                disabled={exporting}
-              >
-                {exporting ? '⏳' : '💾'}
-              </button>
-            </div>
-          </section>
-        </div>
+                <p className="section-note">圆形模式会把圆外部分裁成透明，导出时保持一致。</p>
+              </div>
+              <div className="preview-meta">
+                <span className="meta-pill">特效：{EFFECT_LABELS[effect]}</span>
+                <span className="meta-pill">形状：{shapeLabel}</span>
+                <span className="meta-pill">导出：{formatLabel}</span>
+              </div>
+              <div className="preview-stage">
+                <div className="preview-area">
+                  <PreviewCanvas
+                    image={image}
+                    gifData={gifData}
+                    effect={effect}
+                    shape={shape}
+                    params={params}
+                    canvasRef={canvasRef}
+                  />
+                </div>
+              </div>
+            </section>
+
+            <aside className="control-rail">
+              <section className="panel upload-panel">
+                <div className="section-head">
+                  <div>
+                    <p className="section-kicker">Source</p>
+                    <h2 className="section-title">素材</h2>
+                  </div>
+                  <p className="section-note">支持静态图和 GIF，拖拽到卡片内即可替换。</p>
+                </div>
+                <ImageUploader onImageLoad={handleImageLoad} onGifLoad={handleGifLoad} />
+              </section>
+
+              <section className="panel controls-panel">
+                <div className="section-head">
+                  <div>
+                    <p className="section-kicker">Controls</p>
+                    <h2 className="section-title">细节调节</h2>
+                  </div>
+                  <p className="section-note">调粒子密度、强度、速度和主副色，找到最适合头像的节奏。</p>
+                </div>
+                <EffectControls params={params} onChange={setParams} />
+              </section>
+
+              <section className="panel output-panel">
+                <div className="section-head">
+                  <div>
+                    <p className="section-kicker">Output</p>
+                    <h2 className="section-title">裁切与导出</h2>
+                  </div>
+                  <p className="section-note">先确定头像外形，再选择导出格式。透明背景优先用 APNG、WebP 或 WebM。</p>
+                </div>
+
+                <div className="output-group">
+                  <div className="group-label">头像形状</div>
+                  <div className="shape-selector">
+                    <button
+                      className={`shape-btn ${shape === 'circle' ? 'active' : ''}`}
+                      onClick={() => setShape('circle')}
+                    >
+                      <span className="shape-icon">⭕</span>
+                      <span>圆形</span>
+                    </button>
+                    <button
+                      className={`shape-btn ${shape === 'square' ? 'active' : ''}`}
+                      onClick={() => setShape('square')}
+                    >
+                      <span className="shape-icon">⬜</span>
+                      <span>矩形</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="output-group">
+                  <div className="group-label">导出格式</div>
+                  <div className="export-controls">
+                    <div className="format-toggle">
+                      <button
+                        className={`format-btn ${exportFormat === 'webm' ? 'active' : ''}`}
+                        onClick={() => setExportFormat('webm')}
+                        disabled={!supportsMediaRecorder}
+                        title="WebM 视频，支持半透明"
+                      >
+                        🎬 WebM
+                      </button>
+                      <button
+                        className={`format-btn ${exportFormat === 'gif' ? 'active' : ''}`}
+                        onClick={() => setExportFormat('gif')}
+                        disabled={!supportsWebWorkers}
+                        title="GIF 动图，不支持半透明"
+                      >
+                        🖼️ GIF
+                      </button>
+                      <button
+                        className={`format-btn ${exportFormat === 'apng' ? 'active' : ''}`}
+                        onClick={() => setExportFormat('apng')}
+                        title="动画PNG，支持完整半透明"
+                      >
+                        🎞️ APNG
+                      </button>
+                      <button
+                        className={`format-btn ${exportFormat === 'webp' ? 'active' : ''}`}
+                        onClick={() => setExportFormat('webp')}
+                        title="动画 WebP，支持半透明（Chrome/Edge）"
+                      >
+                        🎬 WebP
+                      </button>
+                    </div>
+                    {exporting && (
+                      <div className="export-progress">
+                        <div
+                          className="export-progress-bar"
+                          style={{ width: `${Math.round(exportProgress * 100)}%` }}
+                        />
+                        <span className="export-progress-text">
+                          {Math.round(exportProgress * 100)}%
+                        </span>
+                      </div>
+                    )}
+                    <button
+                      className="export-btn"
+                      onClick={handleExport}
+                      disabled={exporting}
+                    >
+                      {exporting ? '正在导出…' : `导出 ${formatLabel}`}
+                    </button>
+                  </div>
+                </div>
+              </section>
+            </aside>
+          </div>
+        </section>
       </main>
     </div>
   );
