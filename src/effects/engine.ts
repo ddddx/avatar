@@ -1857,8 +1857,18 @@ export class ParticleEngine {
   private updateMatrix(cw: number, _ch: number, sz: number) {
     this.matrixTimer += 0.016 * (this.params.speed / 50);
     const colWidth = 12;
-    const colCount = Math.floor(sz / colWidth);
-    const cx = cw / 2, startX = cx - sz / 2;
+    const cx = cw / 2;
+    // In circle mode, constrain columns to the inscribed circle
+    const r = sz / 2;
+    let startX: number, endX: number;
+    if (this.shape === 'circle') {
+      startX = cx - r;
+      endX = cx + r;
+    } else {
+      startX = cx - sz / 2;
+      endX = cx + sz / 2;
+    }
+    const colCount = Math.floor((endX - startX) / colWidth);
 
     // Initialize columns
     if (this.matrixColumns.length === 0) {
@@ -1883,21 +1893,32 @@ export class ParticleEngine {
   }
 
   private drawMatrix(g: PIXI.Graphics, cw: number, ch: number, sz: number) {
-    const cy = ch / 2;
-    const topY = cy - sz / 2;
-    const bottomY = cy + sz / 2;
+    const cx = cw / 2, cy = ch / 2;
+    const r = sz / 2;
+    const topY = cy - r;
+    const bottomY = cy + r;
     const charH = 14;
     const greenNum = hexToNum(this.params.color);
     const darkGreenNum = hexToNum(this.params.secondaryColor);
 
-    // Background tint
-    g.rect(cw / 2 - sz / 2, topY, sz, sz).fill({ color: 0x000000, alpha: 0.3 });
+    // Background tint (circle or rect)
+    if (this.shape === 'circle') {
+      g.circle(cx, cy, r).fill({ color: 0x000000, alpha: 0.3 });
+    } else {
+      g.rect(cx - r, topY, sz, sz).fill({ color: 0x000000, alpha: 0.3 });
+    }
 
     for (const col of this.matrixColumns) {
       const visibleChars = Math.floor(sz / charH);
       for (let i = 0; i < Math.min(col.chars.length, visibleChars); i++) {
         const y = topY + ((col.phase + i * charH) % sz);
         if (y < topY || y > bottomY) continue;
+        // In circle mode, skip characters outside the circle
+        if (this.shape === 'circle') {
+          const dx = col.x - cx;
+          const dy = y - cy;
+          if (dx * dx + dy * dy > r * r) continue;
+        }
         const isHead = i === 0;
         const fadeT = i / visibleChars;
         const alpha = isHead ? 1 : Math.max(0, 0.8 - fadeT * 0.7);
@@ -1922,8 +1943,17 @@ export class ParticleEngine {
     const targetCount = Math.floor(this.params.density * 1.5) + 20;
 
     while (this.particles.length < targetCount) {
+      // In circle mode, spawn within the circle
+      let px: number;
+      if (this.shape === 'circle') {
+        const angle = Math.random() * Math.PI * 2;
+        const dist = Math.random() * r * 0.7;
+        px = cx + Math.cos(angle) * dist;
+      } else {
+        px = cx + (Math.random() - 0.5) * sz * 0.8;
+      }
       this.particles.push({
-        x: cx + (Math.random() - 0.5) * sz * 0.8,
+        x: px,
         y: cy + r * 0.8 + Math.random() * r * 0.2,
         vx: 0, vy: 0,
         life: 200 + Math.random() * 300,
