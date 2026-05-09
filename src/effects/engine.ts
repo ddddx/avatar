@@ -25,11 +25,10 @@ function lerpColor(a: string, b: string, t: number): number {
   return (r << 16) | (g << 8) | bv;
 }
 
-function getInsetRoundRectMetrics(half: number, lineWidth: number) {
-  const inset = Math.max(lineWidth / 2 + 1, 2);
-  const innerHalf = Math.max(half - inset, 0);
-  const cornerRadius = Math.max(Math.min(SQUARE_CORNER_RADIUS - inset, innerHalf), 0);
-  return { innerHalf, cornerRadius };
+function getSquareRingMetrics(half: number, lineWidth: number) {
+  const strokeHalf = lineWidth / 2;
+  const cornerRadius = Math.max(Math.min(SQUARE_CORNER_RADIUS - strokeHalf, half), 0);
+  return { half, cornerRadius };
 }
 
 export class ParticleEngine {
@@ -2255,7 +2254,7 @@ export class ParticleEngine {
     const ringR = r - lineWidth / 2;
 
     if (this.shape === 'square') {
-      const { innerHalf, cornerRadius } = getInsetRoundRectMetrics(ringR, lineWidth);
+      const { half, cornerRadius } = getSquareRingMetrics(ringR, lineWidth);
       for (let i = 0; i < steps; i++) {
         const t = i / steps;
         const colorT = (t + time * 0.3) % 1;
@@ -2267,11 +2266,11 @@ export class ParticleEngine {
           rainbowColors[Math.min(ci + 1, rainbowColors.length - 1)],
           cf
         );
-        const p1 = this.getRoundRectPoint(cx, cy, innerHalf, cornerRadius, t);
-        const p2 = this.getRoundRectPoint(cx, cy, innerHalf, cornerRadius, (i + 1) / steps);
+        const p1 = this.getRoundRectPoint(cx, cy, half, cornerRadius, t);
+        const p2 = this.getRoundRectPoint(cx, cy, half, cornerRadius, (i + 1) / steps);
         g.moveTo(p1.x, p1.y);
         g.lineTo(p2.x, p2.y);
-        g.stroke({ width: lineWidth, color: segColor, alpha: 1, cap: 'round', join: 'round' });
+        g.stroke({ width: lineWidth, color: segColor, alpha: 1 });
       }
       return;
     }
@@ -2317,7 +2316,7 @@ export class ParticleEngine {
     const steps = 1920;
 
     if (this.shape === 'square') {
-      const { innerHalf, cornerRadius } = getInsetRoundRectMetrics(ringR, ringWidth);
+      const { half, cornerRadius } = getSquareRingMetrics(ringR, ringWidth);
       for (let i = 0; i < steps; i++) {
         const t = i / steps;
         const colorT = ((t + this.discAngle / (Math.PI * 2)) % 1) * (discColors.length - 1);
@@ -2328,11 +2327,11 @@ export class ParticleEngine {
           discColors[Math.min(ci + 1, discColors.length - 1)],
           cf,
         );
-        const p1 = this.getRoundRectPoint(cx, cy, innerHalf, cornerRadius, t);
-        const p2 = this.getRoundRectPoint(cx, cy, innerHalf, cornerRadius, (i + 1) / steps);
+        const p1 = this.getRoundRectPoint(cx, cy, half, cornerRadius, t);
+        const p2 = this.getRoundRectPoint(cx, cy, half, cornerRadius, (i + 1) / steps);
         g.moveTo(p1.x, p1.y);
         g.lineTo(p2.x, p2.y);
-        g.stroke({ width: ringWidth, color: segColor, alpha: 1, cap: 'round', join: 'round' });
+        g.stroke({ width: ringWidth, color: segColor, alpha: 1 });
       }
     } else {
       for (let i = 0; i < steps; i++) {
