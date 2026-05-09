@@ -109,8 +109,9 @@ function App() {
     const frameCount = Math.floor((duration / 1000) * fps);
     const frameDelay = Math.round(1000 / fps);
 
-    // For no-image mode: composite WebGL canvas over magenta via drawImage,
-    // then snap near-magenta pixels to exact magenta for gif.js transparency.
+    // For no-image mode: composite WebGL canvas over BLACK (not magenta!)
+    // so semi-transparent edges blend to dark colors, not pink.
+    // Then snap near-black pixels to magenta (the gif.js transparent color key).
     let offscreen: HTMLCanvasElement | null = null;
     let offCtx: CanvasRenderingContext2D | null = null;
     if (noImageMode) {
@@ -119,24 +120,22 @@ function App() {
       offscreen.height = canvas.height;
       offCtx = offscreen.getContext('2d')!;
     }
-    const MAGENTA_THRESHOLD_SQ = 40 * 40; // 40^2
+    const BG_THRESHOLD = 8; // pixels dimmer than this are "background" → transparent
 
     // Capture frames
     for (let i = 0; i < frameCount; i++) {
       if (noImageMode && offscreen && offCtx) {
-        // 1. Fill with magenta (the transparent color key)
-        offCtx.fillStyle = '#ff00ff';
+        // 1. Fill with black
+        offCtx.fillStyle = '#000000';
         offCtx.fillRect(0, 0, offscreen.width, offscreen.height);
-        // 2. Draw WebGL canvas on top — composites transparent PIXI pixels over magenta
+        // 2. Draw WebGL canvas — semi-transparent edges blend with black (dark, not pink)
         offCtx.drawImage(canvas, 0, 0);
-        // 3. Snap near-magenta to exact magenta so gif.js matches them
+        // 3. Near-black pixels → magenta (transparent); others → keep color
         const imgData = offCtx.getImageData(0, 0, offscreen.width, offscreen.height);
         const px = imgData.data;
         for (let j = 0; j < px.length; j += 4) {
-          const dr = px[j] - 255;
-          const dg = px[j + 1];
-          const db = px[j + 2] - 255;
-          if (dr * dr + dg * dg + db * db < MAGENTA_THRESHOLD_SQ) {
+          if (Math.max(px[j], px[j + 1], px[j + 2]) < BG_THRESHOLD) {
+            // Background → exact magenta for gif.js transparency
             px[j] = 255; px[j + 1] = 0; px[j + 2] = 255;
           }
           px[j + 3] = 255;
