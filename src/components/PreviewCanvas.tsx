@@ -20,6 +20,7 @@ const PreviewCanvas: React.FC<Props> = ({ image, effect, shape, params, canvasRe
   const imageSpriteRef = useRef<PIXI.Sprite | null>(null);
   const maskRef = useRef<PIXI.Graphics | null>(null);
   const effectsGfxRef = useRef<PIXI.Graphics | null>(null);
+  const glowGfxRef = useRef<PIXI.Graphics | null>(null);
   const rafRef = useRef<number>(0);
   const initRef = useRef(false);
 
@@ -76,6 +77,11 @@ const PreviewCanvas: React.FC<Props> = ({ image, effect, shape, params, canvasRe
         effectsGfxRef.current.destroy();
         effectsGfxRef.current = null;
       }
+      if (glowGfxRef.current) {
+        app.stage.removeChild(glowGfxRef.current);
+        glowGfxRef.current.destroy();
+        glowGfxRef.current = null;
+      }
 
       cancelAnimationFrame(rafRef.current);
 
@@ -105,7 +111,16 @@ const PreviewCanvas: React.FC<Props> = ({ image, effect, shape, params, canvasRe
       app.stage.addChild(sprite);
       imageSpriteRef.current = sprite;
 
-      // Create effects layer — same mask clips effects to the shape
+      // Create glow layer (blurred, underneath) — soft light halo
+      const glowGfx = new PIXI.Graphics();
+      glowGfx.blendMode = 'add';
+      glowGfx.mask = mask;
+      const blurFilter = new PIXI.BlurFilter({ strength: 8, quality: 3 });
+      glowGfx.filters = [blurFilter];
+      app.stage.addChild(glowGfx);
+      glowGfxRef.current = glowGfx;
+
+      // Create sharp effects layer (on top) — bright cores
       const effectsGfx = new PIXI.Graphics();
       effectsGfx.blendMode = 'add';
       effectsGfx.mask = mask;
@@ -119,11 +134,12 @@ const PreviewCanvas: React.FC<Props> = ({ image, effect, shape, params, canvasRe
       engine.setShape(shape);
       engine.setParams(params);
 
-      // Animation loop
+      // Animation loop — draw to both glow (blurred) and sharp layers
       const tick = () => {
         if (destroyed) return;
         engine.update(SIZE, SIZE, imgSize);
-        engine.draw(effectsGfx, SIZE, SIZE, imgSize);
+        engine.draw(glowGfx, SIZE, SIZE, imgSize);   // blurred glow
+        engine.draw(effectsGfx, SIZE, SIZE, imgSize); // sharp cores
         rafRef.current = requestAnimationFrame(tick);
       };
       rafRef.current = requestAnimationFrame(tick);
