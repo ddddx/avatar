@@ -25,10 +25,20 @@ function lerpColor(a: string, b: string, t: number): number {
   return (r << 16) | (g << 8) | bv;
 }
 
-function getSquareRingMetrics(half: number, lineWidth: number) {
-  const strokeHalf = lineWidth / 2;
-  const cornerRadius = Math.max(Math.min(SQUARE_CORNER_RADIUS - strokeHalf, half), 0);
-  return { half, cornerRadius };
+function drawRingQuad(
+  g: PIXI.Graphics,
+  p1Outer: { x: number; y: number },
+  p2Outer: { x: number; y: number },
+  p2Inner: { x: number; y: number },
+  p1Inner: { x: number; y: number },
+  color: number,
+) {
+  g.poly([
+    p1Outer.x, p1Outer.y,
+    p2Outer.x, p2Outer.y,
+    p2Inner.x, p2Inner.y,
+    p1Inner.x, p1Inner.y,
+  ], true).fill({ color, alpha: 1 });
 }
 
 export class ParticleEngine {
@@ -2254,7 +2264,10 @@ export class ParticleEngine {
     const ringR = r - lineWidth / 2;
 
     if (this.shape === 'square') {
-      const { half, cornerRadius } = getSquareRingMetrics(ringR, lineWidth);
+      const outerHalf = Math.min(r, sz / 2);
+      const innerHalf = Math.max(outerHalf - lineWidth, 0);
+      const outerRadius = SQUARE_CORNER_RADIUS;
+      const innerRadius = Math.max(SQUARE_CORNER_RADIUS - lineWidth, 0);
       for (let i = 0; i < steps; i++) {
         const t = i / steps;
         const colorT = (t + time * 0.3) % 1;
@@ -2266,11 +2279,12 @@ export class ParticleEngine {
           rainbowColors[Math.min(ci + 1, rainbowColors.length - 1)],
           cf
         );
-        const p1 = this.getRoundRectPoint(cx, cy, half, cornerRadius, t);
-        const p2 = this.getRoundRectPoint(cx, cy, half, cornerRadius, (i + 1) / steps);
-        g.moveTo(p1.x, p1.y);
-        g.lineTo(p2.x, p2.y);
-        g.stroke({ width: lineWidth, color: segColor, alpha: 1 });
+        const nextT = (i + 1) / steps;
+        const p1Outer = this.getRoundRectPoint(cx, cy, outerHalf, outerRadius, t);
+        const p2Outer = this.getRoundRectPoint(cx, cy, outerHalf, outerRadius, nextT);
+        const p2Inner = this.getRoundRectPoint(cx, cy, innerHalf, innerRadius, nextT);
+        const p1Inner = this.getRoundRectPoint(cx, cy, innerHalf, innerRadius, t);
+        drawRingQuad(g, p1Outer, p2Outer, p2Inner, p1Inner, segColor);
       }
       return;
     }
@@ -2316,7 +2330,10 @@ export class ParticleEngine {
     const steps = 1920;
 
     if (this.shape === 'square') {
-      const { half, cornerRadius } = getSquareRingMetrics(ringR, ringWidth);
+      const outerHalf = Math.min(r, sz / 2);
+      const innerHalf = Math.max(outerHalf - ringWidth, 0);
+      const outerRadius = SQUARE_CORNER_RADIUS;
+      const innerRadius = Math.max(SQUARE_CORNER_RADIUS - ringWidth, 0);
       for (let i = 0; i < steps; i++) {
         const t = i / steps;
         const colorT = ((t + this.discAngle / (Math.PI * 2)) % 1) * (discColors.length - 1);
@@ -2327,11 +2344,12 @@ export class ParticleEngine {
           discColors[Math.min(ci + 1, discColors.length - 1)],
           cf,
         );
-        const p1 = this.getRoundRectPoint(cx, cy, half, cornerRadius, t);
-        const p2 = this.getRoundRectPoint(cx, cy, half, cornerRadius, (i + 1) / steps);
-        g.moveTo(p1.x, p1.y);
-        g.lineTo(p2.x, p2.y);
-        g.stroke({ width: ringWidth, color: segColor, alpha: 1 });
+        const nextT = (i + 1) / steps;
+        const p1Outer = this.getRoundRectPoint(cx, cy, outerHalf, outerRadius, t);
+        const p2Outer = this.getRoundRectPoint(cx, cy, outerHalf, outerRadius, nextT);
+        const p2Inner = this.getRoundRectPoint(cx, cy, innerHalf, innerRadius, nextT);
+        const p1Inner = this.getRoundRectPoint(cx, cy, innerHalf, innerRadius, t);
+        drawRingQuad(g, p1Outer, p2Outer, p2Inner, p1Inner, segColor);
       }
     } else {
       for (let i = 0; i < steps; i++) {
