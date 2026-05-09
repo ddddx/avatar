@@ -1,6 +1,6 @@
 import type { Application, Container, Graphics } from 'pixi.js';
 
-export type EffectType = 'lightning' | 'fire' | 'glow' | 'orbit' | 'shield' | 'frost' | 'ripple' | 'petal' | 'stardust' | 'prism' | 'vortex' | 'firework' | 'gold';
+export type EffectType = 'lightning' | 'fire' | 'glow' | 'orbit' | 'shield' | 'frost' | 'ripple' | 'petal' | 'stardust' | 'prism' | 'vortex' | 'firework' | 'gold' | 'spin' | 'loader' | 'matrix' | 'bubble' | 'pulse';
 export type CropShape = 'circle' | 'square';
 
 export interface TrailPoint {
@@ -84,17 +84,22 @@ export const DEFAULT_PARAMS: EffectParams = {
 };
 
 export const EFFECT_PRESETS: Record<EffectType, Partial<EffectParams>> = {
-  lightning: { color: '#00d4ff', secondaryColor: '#8b5cf6', density: 40, intensity: 60, speed: 70 },
-  fire:      { color: '#ff6b35', secondaryColor: '#ffcc02', density: 60, intensity: 70, speed: 50 },
-  glow:      { color: '#a855f7', secondaryColor: '#ec4899', density: 50, intensity: 50, speed: 40 },
-  orbit:     { color: '#00ffcc', secondaryColor: '#0088ff', density: 30, intensity: 50, speed: 50 },
-  shield:    { color: '#00ffaa', secondaryColor: '#00ccff', density: 40, intensity: 60, speed: 30 },
-  frost:     { color: '#e0f0ff', secondaryColor: '#88ccff', density: 50, intensity: 50, speed: 40 },
-  ripple:    { color: '#44aaff', secondaryColor: '#88ddff', density: 40, intensity: 60, speed: 45 },
-  petal:     { color: '#ffb6c1', secondaryColor: '#ff69b4', density: 50, intensity: 50, speed: 40 },
-  stardust:  { color: '#6644cc', secondaryColor: '#aa88ff', density: 60, intensity: 50, speed: 30 },
-  prism:     { color: '#ff4444', secondaryColor: '#4444ff', density: 50, intensity: 60, speed: 50 },
-  vortex:    { color: '#00ccff', secondaryColor: '#8844ff', density: 60, intensity: 70, speed: 70 },
-  firework:  { color: '#ff4466', secondaryColor: '#ffaa00', density: 50, intensity: 70, speed: 50 },
-  gold:      { color: '#ffd700', secondaryColor: '#ffec8b', density: 50, intensity: 50, speed: 40 },
+  lightning: { color: '#4dc9f6', secondaryColor: '#a855f7', density: 40, intensity: 60, speed: 35 },
+  fire:      { color: '#ff4500', secondaryColor: '#ffd700', density: 65, intensity: 75, speed: 55 },
+  glow:      { color: '#c084fc', secondaryColor: '#f472b6', density: 55, intensity: 60, speed: 40 },
+  orbit:     { color: '#34d399', secondaryColor: '#60a5fa', density: 40, intensity: 55, speed: 50 },
+  shield:    { color: '#22d3ee', secondaryColor: '#a78bfa', density: 50, intensity: 65, speed: 35 },
+  frost:     { color: '#e0f2fe', secondaryColor: '#7dd3fc', density: 55, intensity: 55, speed: 40 },
+  ripple:    { color: '#38bdf8', secondaryColor: '#a5f3fc', density: 50, intensity: 65, speed: 45 },
+  petal:     { color: '#fda4af', secondaryColor: '#fb7185', density: 55, intensity: 55, speed: 40 },
+  stardust:  { color: '#c084fc', secondaryColor: '#e879f9', density: 65, intensity: 55, speed: 35 },
+  prism:     { color: '#f87171', secondaryColor: '#60a5fa', density: 55, intensity: 65, speed: 50 },
+  vortex:    { color: '#22d3ee', secondaryColor: '#a855f7', density: 65, intensity: 75, speed: 65 },
+  firework:  { color: '#fb923c', secondaryColor: '#fbbf24', density: 55, intensity: 75, speed: 50 },
+  gold:      { color: '#fbbf24', secondaryColor: '#fde68a', density: 55, intensity: 60, speed: 40 },
+  spin:      { color: '#a78bfa', secondaryColor: '#60a5fa', density: 50, intensity: 60, speed: 55 },
+  loader:    { color: '#60a5fa', secondaryColor: '#a78bfa', density: 30, intensity: 50, speed: 50 },
+  matrix:    { color: '#22c55e', secondaryColor: '#16a34a', density: 60, intensity: 65, speed: 45 },
+  bubble:    { color: '#67e8f9', secondaryColor: '#a5f3fc', density: 55, intensity: 55, speed: 40 },
+  pulse:     { color: '#f472b6', secondaryColor: '#c084fc', density: 40, intensity: 70, speed: 50 },
 };

@@ -20,6 +20,11 @@ const effects: { type: EffectType; icon: string; label: string }[] = [
   { type: 'vortex',    icon: '🌪️', label: '旋风' },
   { type: 'firework',  icon: '🎆', label: '烟花' },
   { type: 'gold',      icon: '✨', label: '金粉' },
+  { type: 'spin',      icon: '🔄', label: '旋转' },
+  { type: 'loader',    icon: '⏳', label: '加载中' },
+  { type: 'matrix',    icon: '🟢', label: '矩阵雨' },
+  { type: 'bubble',    icon: '🫧', label: '气泡' },
+  { type: 'pulse',     icon: '📡', label: '脉冲环' },
 ];
 
 const EffectSelector: React.FC<Props> = ({ selected, onChange }) => {
