@@ -84,7 +84,7 @@ export const DEFAULT_PARAMS: EffectParams = {
 };
 
 export const EFFECT_PRESETS: Record<EffectType, Partial<EffectParams>> = {
-  lightning: { color: '#4dc9f6', secondaryColor: '#a855f7', density: 50, intensity: 70, speed: 70 },
+  lightning: { color: '#4dc9f6', secondaryColor: '#a855f7', density: 40, intensity: 60, speed: 35 },
   fire:      { color: '#ff4500', secondaryColor: '#ffd700', density: 65, intensity: 75, speed: 55 },
   glow:      { color: '#c084fc', secondaryColor: '#f472b6', density: 55, intensity: 60, speed: 40 },
   orbit:     { color: '#34d399', secondaryColor: '#60a5fa', density: 40, intensity: 55, speed: 50 },

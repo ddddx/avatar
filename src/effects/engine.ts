@@ -85,7 +85,7 @@ export class ParticleEngine {
   setParams(p: EffectParams) { this.params = p; }
 
   update(canvasW: number, canvasH: number, imgSize: number) {
-    const dt = (this.params.speed / 50) * 1.5;
+    const dt = (this.params.speed / 50) * 0.8;
     this.time += dt * 0.016;
 
     switch (this.effect) {
@@ -205,39 +205,49 @@ export class ParticleEngine {
       const boltCount = 1 + Math.floor(this.params.density / 30);
 
       for (let i = 0; i < boltCount; i++) {
-        const t = Math.random();
-        const ep = this.getEdgePoint(cw, ch, sz, t);
-        const cx = cw / 2, cy = ch / 2;
-
-        const targetX = cx + (Math.random() - 0.5) * sz * 0.3;
-        const targetY = cy + (Math.random() - 0.5) * sz * 0.3;
+        // Cross-bolt: edge-to-edge, or edge-to-center
+        const t1 = Math.random();
+        const ep1 = this.getEdgePoint(cw, ch, sz, t1);
+        let targetX: number, targetY: number;
+        if (Math.random() < 0.5) {
+          // Cross bolt: from one edge to opposite edge
+          const t2 = (t1 + 0.3 + Math.random() * 0.4) % 1;
+          const ep2 = this.getEdgePoint(cw, ch, sz, t2);
+          targetX = ep2.x;
+          targetY = ep2.y;
+        } else {
+          // Edge to near-center
+          const cx = cw / 2, cy = ch / 2;
+          targetX = cx + (Math.random() - 0.5) * sz * 0.25;
+          targetY = cy + (Math.random() - 0.5) * sz * 0.25;
+        }
 
         const segments: Array<{ x1: number; y1: number; x2: number; y2: number; width: number }> = [];
-        const baseWidth = 2 + (this.params.intensity / 100) * 3;
-        const depth = 4 + Math.floor(this.params.intensity / 20);
-        this.generateBolt(ep.x, ep.y, targetX, targetY, baseWidth, depth, segments);
+        const baseWidth = 0.8 + (this.params.intensity / 100) * 1.2;
+        const depth = 3 + Math.floor(this.params.intensity / 25);
+        this.generateBolt(ep1.x, ep1.y, targetX, targetY, baseWidth, depth, segments);
 
         this.lightningBolts.push({
           segments,
-          life: 6 + Math.random() * 10,
-          maxLife: 16,
+          life: 3 + Math.random() * 5,
+          maxLife: 8,
           glow: 0.8 + Math.random() * 0.2,
         });
       }
     }
 
-    const sparkCount = Math.floor(this.params.density / 15) + 1;
+    const sparkCount = Math.floor(this.params.density / 20) + 1;
     for (let i = 0; i < sparkCount; i++) {
       const t = Math.random();
       const ep = this.getEdgePoint(cw, ch, sz, t);
       this.particles.push({
         x: ep.x + (Math.random() - 0.5) * 4,
         y: ep.y + (Math.random() - 0.5) * 4,
-        vx: ep.nx * (1 + Math.random() * 2),
-        vy: ep.ny * (1 + Math.random() * 2),
-        life: 5 + Math.random() * 10,
-        maxLife: 15,
-        size: 1 + Math.random() * 2,
+        vx: ep.nx * (0.5 + Math.random() * 1),
+        vy: ep.ny * (0.5 + Math.random() * 1),
+        life: 3 + Math.random() * 5,
+        maxLife: 8,
+        size: 0.5 + Math.random() * 1,
         color: '#ffffff',
         alpha: 1,
         trail: [],
@@ -267,9 +277,9 @@ export class ParticleEngine {
 
       // 3-layer glow: outer (thick, low alpha) → mid → core (thin, high alpha)
       const layers = [
-        { width: 8, color: 0x4488ff, alpha: baseAlpha * 0.35 },
-        { width: 4, color: 0x88bbff, alpha: baseAlpha * 0.65 },
-        { width: 1.5, color: 0xffffff, alpha: baseAlpha * 1.0 },
+        { width: 4, color: 0x4488ff, alpha: baseAlpha * 0.35 },
+        { width: 2, color: 0x88bbff, alpha: baseAlpha * 0.65 },
+        { width: 0.8, color: 0xffffff, alpha: baseAlpha * 1.0 },
       ];
 
       for (const seg of bolt.segments) {
