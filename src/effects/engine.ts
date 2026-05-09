@@ -610,7 +610,9 @@ export class ParticleEngine {
     const targetPerLayer = Math.floor(this.params.density / layerCount / 3) + 3;
 
     for (let layer = 0; layer < layerCount; layer++) {
-      const layerR = sz / 2 + 8 + layer * 18;
+      // In circle mode, keep orbits inside the circle
+      const maxR = this.shape === 'circle' ? sz / 2 - 10 : sz / 2 + 8;
+      const layerR = maxR - layer * 18;
       const existing = this.particles.filter(p => p.orbitLayer === layer).length;
       const toSpawn = targetPerLayer - existing;
       for (let i = 0; i < toSpawn; i++) {
@@ -662,7 +664,8 @@ export class ParticleEngine {
 
     // Dashed orbit rings
     for (let i = 0; i < layerCount; i++) {
-      const r = sz / 2 + 8 + i * 18;
+      const maxR = this.shape === 'circle' ? sz / 2 - 15 : sz / 2 + 8;
+      const r = this.shape === 'circle' ? maxR - i * 15 : maxR + i * 18;
       const ringColor = i % 2 === 0 ? colorNum : secColorNum;
       const dashCount = 40;
       for (let d = 0; d < dashCount; d++) {
@@ -721,7 +724,7 @@ export class ParticleEngine {
     while (this.particles.length < segCount) {
       const angle = Math.random() * Math.PI * 2;
       const ring = Math.floor(Math.random() * 3);
-      const baseR = sz / 2 + 6 + ring * 10;
+      const baseR = this.shape === 'circle' ? sz / 2 - 15 + ring * 10 : sz / 2 + 6 + ring * 10;
       const isArc = Math.random() < 0.2;
 
       this.particles.push({
@@ -767,7 +770,7 @@ export class ParticleEngine {
 
   private drawShield(g: PIXI.Graphics, cw: number, ch: number, sz: number) {
     const cx = cw / 2, cy = ch / 2;
-    const baseR = sz / 2;
+    const baseR = this.shape === 'circle' ? sz / 2 - 15 : sz / 2;
     const flowAngle = this.shieldPhase * 0.5;
     const time = this.shieldPhase;
     const colorNum = hexToNum(this.params.color);
@@ -1124,10 +1127,11 @@ export class ParticleEngine {
   private updatePetal(cw: number, ch: number, _sz: number) {
     this.petalTime += 0.016 * (this.params.speed / 50);
 
-    // Spawn petals from top
+    // Spawn petals from top (gradually ramp up)
+    const warmup = Math.min(1, this.petalTime / 2);
     const spawnRate = Math.floor(this.params.density / 10) + 1;
     const petalColors = ['#ffb6c1', '#ffc0cb', '#ff69b4', '#fff0f5', '#ffffff'];
-    for (let i = 0; i < spawnRate; i++) {
+    for (let i = 0; i < spawnRate * warmup; i++) {
       this.particles.push({
         x: Math.random() * cw,
         y: -10 - Math.random() * 20,
@@ -1332,8 +1336,8 @@ export class ParticleEngine {
       this.particles.push({
         x: ep.x + (Math.random() - 0.5) * 4,
         y: ep.y + (Math.random() - 0.5) * 4,
-        vx: ep.nx * (0.5 + Math.random() * 1.5),
-        vy: ep.ny * (0.5 + Math.random() * 1.5),
+        vx: -ep.nx * (0.5 + Math.random() * 1.5),
+        vy: -ep.ny * (0.5 + Math.random() * 1.5),
         life: 50 + Math.random() * 80,
         maxLife: 130,
         size: 1.5 + Math.random() * 3,
@@ -1888,7 +1892,7 @@ export class ParticleEngine {
 
     // Update columns
     this.matrixColumns.forEach(col => {
-      col.phase += col.speed * 0.016 * (this.params.speed / 50);
+      col.phase += col.speed * 2 * (this.params.speed / 50);
     });
   }
 
@@ -1940,7 +1944,8 @@ export class ParticleEngine {
   private updateBubble(cw: number, ch: number, sz: number) {
     this.bubbleTime += 0.016 * (this.params.speed / 50);
     const cx = cw / 2, cy = ch / 2, r = sz / 2;
-    const targetCount = Math.floor(this.params.density * 1.5) + 20;
+    const warmup = Math.min(1, this.bubbleTime / 2);
+    const targetCount = Math.floor((this.params.density * 1.5 + 20) * warmup);
 
     while (this.particles.length < targetCount) {
       // In circle mode, spawn within the circle
