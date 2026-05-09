@@ -406,20 +406,20 @@ export class ParticleEngine {
 
   private updateFire(cw: number, ch: number, sz: number) {
     const spd = this.params.speed / 50;
-    const spawnRate = Math.floor(this.params.density / 3) + 3;
+    const spawnRate = Math.floor(this.params.density / 4) + 2;
     const ext = (this.params.intensity / 100);
     const cx = cw / 2, cy = ch / 2, r = sz / 2;
 
     for (let i = 0; i < spawnRate; i++) {
-      // Fire rises from the bottom area
-      const spreadX = (Math.random() - 0.5) * r * 0.6;
+      // Fire rises from the bottom area — wider spread for dispersed look
+      const spreadX = (Math.random() - 0.5) * r * 1.2;
       const baseX = cx + spreadX;
       const baseY = cy + r * 0.7 + Math.random() * r * 0.2;
 
       this.particles.push({
-        x: baseX + (Math.random() - 0.5) * 6,
+        x: baseX + (Math.random() - 0.5) * 16,
         y: baseY,
-        vx: (Math.random() - 0.5) * 0.8,
+        vx: (Math.random() - 0.5) * 1.5,
         vy: -(1 + Math.random() * 2 * ext) * spd,
         life: 25 + Math.random() * 35,
         maxLife: 60,
@@ -435,7 +435,7 @@ export class ParticleEngine {
         p.trail.push({ x: p.x, y: p.y, alpha: p.alpha, size: p.size });
         if (p.trail.length > 5) p.trail.shift();
       }
-      p.vx += (Math.random() - 0.5) * 0.15;
+      p.vx += (Math.random() - 0.5) * 0.35;
       p.vy -= 0.04;
       p.x += p.vx;
       p.y += p.vy;
@@ -453,11 +453,11 @@ export class ParticleEngine {
     // Bottom glow circle
     const glowIntensity = 0.08 + (this.params.intensity / 100) * 0.06;
     const bottomY = cy + r;
-    // Draw concentric circles for radial glow simulation
+    // Draw concentric circles for radial glow simulation (wider to match dispersed fire)
     const gradSteps = 8;
     for (let i = gradSteps; i >= 0; i--) {
       const t = i / gradSteps;
-      const radius = r * 1.3 * t;
+      const radius = r * 1.6 * t;
       const alpha = glowIntensity * 0.4 * (1 - t);
       const color = lerpColor('#cc5018', '#aa3000', t);
       g.circle(cx, bottomY, radius).fill({ color, alpha });
