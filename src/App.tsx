@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
+import type { GifData } from './lib/gif-decoder';
 import ImageUploader from './components/ImageUploader';
 import EffectSelector from './components/EffectSelector';
 import EffectControls from './components/EffectControls';
@@ -7,6 +8,10 @@ import { DEFAULT_PARAMS, EFFECT_PRESETS } from './effects/types';
 import type { EffectType, CropShape, EffectParams } from './effects/types';
 // @ts-ignore - gif.js has no types
 import GIF from './lib/gif.js';
+// @ts-ignore - upng-js has no types
+import * as UPNG from 'upng-js';
+// @ts-ignore - wasm-webp has no types
+import { encodeAnimation } from 'wasm-webp';
 import './App.css';
 
 // Detect browser capabilities
@@ -15,16 +20,26 @@ const supportsWebWorkers = typeof Worker !== 'undefined';
 
 function App() {
   const [image, setImage] = useState<HTMLImageElement | null>(null);
-  const [noImageMode, setNoImageMode] = useState(false);
+  const [gifData, setGifData] = useState<GifData | null>(null);
   const [effect, setEffect] = useState<EffectType>('lightning');
   const [shape, setShape] = useState<CropShape>('circle');
   const [params, setParams] = useState<EffectParams>({ ...DEFAULT_PARAMS });
   const [exporting, setExporting] = useState(false);
-  const [exportFormat, setExportFormat] = useState<'gif' | 'webm' | 'frames'>(
+  const [exportFormat, setExportFormat] = useState<'gif' | 'webm' | 'webp' | 'apng'>(
     supportsMediaRecorder ? 'webm' : 'gif'
   );
   const [exportProgress, setExportProgress] = useState(0);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  const handleImageLoad = useCallback((img: HTMLImageElement) => {
+    setImage(img);
+    setGifData(null); // Clear GIF when static image loaded
+  }, []);
+
+  const handleGifLoad = useCallback((data: GifData) => {
+    setGifData(data);
+    setImage(null); // Clear static image when GIF loaded
+  }, []);
 
   const handleEffectChange = useCallback((e: EffectType) => {
     setEffect(e);
@@ -103,7 +118,7 @@ function App() {
       width: canvas.width,
       height: canvas.height,
       workerScript: import.meta.env.BASE_URL + 'gif.worker.js',
-      transparent: noImageMode ? 0xff00ff : undefined,
+      transparent: (!image && !gifData) ? 0xff00ff : undefined,
     });
 
     const frameCount = Math.floor((duration / 1000) * fps);
@@ -114,7 +129,7 @@ function App() {
     // Then snap near-black pixels to magenta (the gif.js transparent color key).
     let offscreen: HTMLCanvasElement | null = null;
     let offCtx: CanvasRenderingContext2D | null = null;
-    if (noImageMode) {
+    if (!image && !gifData) {
       offscreen = document.createElement('canvas');
       offscreen.width = canvas.width;
       offscreen.height = canvas.height;
@@ -124,7 +139,7 @@ function App() {
 
     // Capture frames
     for (let i = 0; i < frameCount; i++) {
-      if (noImageMode && offscreen && offCtx) {
+      if (!image && !gifData && offscreen && offCtx) {
         // 1. Fill with black
         offCtx.fillStyle = '#000000';
         offCtx.fillRect(0, 0, offscreen.width, offscreen.height);
@@ -168,35 +183,82 @@ function App() {
 
       gif.render();
     });
-  }, [effect, downloadBlob, noImageMode]);
+  }, [effect, downloadBlob, image, gifData]);
 
   // Export as PNG sequence frames (most compatible)
-  const exportFrames = useCallback(async (canvas: HTMLCanvasElement) => {
-    const JSZip = (await import('jszip')).default;
-    const zip = new JSZip();
+  // Export as APNG (animated PNG with full alpha support)
+  const exportAPNG = useCallback(async (canvas: HTMLCanvasElement) => {
+    const duration = 2000;
+    const fps = 15;
+    const frameCount = Math.floor((duration / 1000) * fps);
+    const frameDelay = Math.round(1000 / fps);
+    const w = canvas.width;
+    const h = canvas.height;
+
+    const frames: ArrayBuffer[] = [];
+    const delays: number[] = [];
+
+    // Create offscreen canvas for capturing RGBA pixels
+    const offscreen = document.createElement('canvas');
+    offscreen.width = w;
+    offscreen.height = h;
+    const offCtx = offscreen.getContext('2d')!;
+
+    for (let i = 0; i < frameCount; i++) {
+      if (!image && !gifData) {
+        // Transparent background — just draw the WebGL canvas directly
+        offCtx.clearRect(0, 0, w, h);
+        offCtx.drawImage(canvas, 0, 0);
+      } else {
+        offCtx.drawImage(canvas, 0, 0);
+      }
+      const imgData = offCtx.getImageData(0, 0, w, h);
+      // Copy the pixel data buffer (UPNG needs ArrayBuffer)
+      frames.push(imgData.data.buffer.slice(0));
+      delays.push(frameDelay);
+
+      setExportProgress((i + 1) / frameCount * 0.8);
+      await new Promise(r => setTimeout(r, frameDelay));
+    }
+
+    // Encode APNG — cnum=0 means auto colors
+    setExportProgress(0.9);
+    const apng = UPNG.encode(frames, w, h, 0, delays);
+    const blob = new Blob([apng], { type: 'image/apng' });
+    setExportProgress(1);
+    downloadBlob(blob, `avatar-${effect}.apng`);
+  }, [effect, downloadBlob, image, gifData]);
+
+  // Export as animated WebP (single .webp file) using wasm-webp
+  const exportWebP = useCallback(async (canvas: HTMLCanvasElement) => {
     const duration = 2000;
     const fps = 12;
     const frameCount = Math.floor((duration / 1000) * fps);
     const frameDelay = Math.round(1000 / fps);
+    const w = canvas.width;
+    const h = canvas.height;
+    // PIXI uses WebGL — can't getContext('2d') directly, use offscreen canvas
+    const offscreen = document.createElement('canvas');
+    offscreen.width = w;
+    offscreen.height = h;
+    const ctx = offscreen.getContext('2d')!;
 
-    // Capture frames as PNG
+    const frames: { data: Uint8Array; duration: number }[] = [];
     for (let i = 0; i < frameCount; i++) {
-      const dataUrl = canvas.toDataURL('image/png');
-      const base64 = dataUrl.split(',')[1];
-      const paddedIndex = String(i + 1).padStart(3, '0');
-      zip.file(`frame-${paddedIndex}.png`, base64, { base64: true });
+      ctx.clearRect(0, 0, w, h);
+      ctx.drawImage(canvas, 0, 0);
+      const imgData = ctx.getImageData(0, 0, w, h);
+      frames.push({ data: new Uint8Array(imgData.data), duration: frameDelay });
       setExportProgress((i + 1) / frameCount * 0.7);
       await new Promise(r => setTimeout(r, frameDelay));
     }
 
-    // Generate zip
     setExportProgress(0.8);
-    const blob = await zip.generateAsync({ type: 'blob' }, (metadata) => {
-      setExportProgress(0.8 + metadata.percent / 100 * 0.2);
-    });
-
+    const webpData = await encodeAnimation(w, h, !image && !gifData, frames);
+    if (!webpData) throw new Error('WebP animation encoding failed');
     setExportProgress(1);
-    downloadBlob(blob, `avatar-${effect}-frames.zip`);
+    const blob = new Blob([webpData.buffer as ArrayBuffer], { type: 'image/webp' });
+    downloadBlob(blob, `avatar-${effect}.webp`);
   }, [effect, downloadBlob]);
 
   const handleExport = useCallback(async () => {
@@ -212,10 +274,12 @@ function App() {
           return;
         }
         await exportWebM(canvas);
+      } else if (exportFormat === 'apng') {
+        await exportAPNG(canvas);
       } else if (exportFormat === 'gif') {
         await exportGIF(canvas);
-      } else {
-        await exportFrames(canvas);
+      } else if (exportFormat === 'webp') {
+        await exportWebP(canvas);
       }
     } catch (err) {
       console.error('Export failed:', err);
@@ -225,7 +289,7 @@ function App() {
       setExporting(false);
       setExportProgress(0);
     }
-  }, [exportFormat, exporting, exportWebM, exportGIF, exportFrames]);
+  }, [exportFormat, exporting, exportWebM, exportGIF, exportAPNG, exportWebP]);
 
   return (
     <div className="app">
@@ -244,38 +308,22 @@ function App() {
 
         {/* Center: Preview */}
         <div className="preview-area">
-          {(image || noImageMode) ? (
+          {
             <PreviewCanvas
               image={image}
+              gifData={gifData}
               effect={effect}
               shape={shape}
               params={params}
               canvasRef={canvasRef}
-              noImageMode={noImageMode}
             />
-          ) : (
-            <div className="preview-placeholder">
-              <div className="placeholder-icon">🖼️</div>
-              <p>上传一张头像图片开始创作</p>
-            </div>
-          )}
+          }
         </div>
 
         {/* Bottom: Controls bar */}
         <div className="bottom-bar">
           <section className="panel">
-            <div className="no-image-toggle">
-              <button
-                className={`shape-btn ${noImageMode ? 'active' : ''}`}
-                onClick={() => {
-                  setNoImageMode(!noImageMode);
-                  if (!noImageMode) setImage(null);
-                }}
-              >
-                {noImageMode ? '✅ 无图' : '🖼️ 无图'}
-              </button>
-            </div>
-            {!noImageMode && <ImageUploader onImageLoad={setImage} />}
+            <ImageUploader onImageLoad={handleImageLoad} onGifLoad={handleGifLoad} />
           </section>
 
           <section className="panel">
@@ -306,22 +354,33 @@ function App() {
                   className={`format-btn ${exportFormat === 'webm' ? 'active' : ''}`}
                   onClick={() => setExportFormat('webm')}
                   disabled={!supportsMediaRecorder}
+                  title="WebM 视频，支持半透明"
                 >
-                  🎬
+                  🎬 WebM
                 </button>
                 <button
                   className={`format-btn ${exportFormat === 'gif' ? 'active' : ''}`}
                   onClick={() => setExportFormat('gif')}
                   disabled={!supportsWebWorkers}
+                  title="GIF 动图，不支持半透明"
                 >
-                  🖼️
+                  🖼️ GIF
                 </button>
                 <button
-                  className={`format-btn ${exportFormat === 'frames' ? 'active' : ''}`}
-                  onClick={() => setExportFormat('frames')}
+                  className={`format-btn ${exportFormat === 'apng' ? 'active' : ''}`}
+                  onClick={() => setExportFormat('apng')}
+                  title="动画PNG，支持完整半透明"
                 >
-                  📁
+                  🎞️ APNG
                 </button>
+                <button
+                  className={`format-btn ${exportFormat === 'webp' ? 'active' : ''}`}
+                  onClick={() => setExportFormat('webp')}
+                  title="动画 WebP，支持半透明（Chrome/Edge）"
+                >
+                  🎬 WebP
+                </button>
+
               </div>
               {exporting && (
                 <div className="export-progress">
@@ -337,7 +396,7 @@ function App() {
               <button
                 className="export-btn"
                 onClick={handleExport}
-                disabled={(!image && !noImageMode) || exporting}
+                disabled={exporting}
               >
                 {exporting ? '⏳' : '💾'}
               </button>

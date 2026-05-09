@@ -12,14 +12,18 @@
   "dependencies": {
     "gif.js": "^0.2.0",
     "jszip": "^3.10.1",
+    "omggif": "^1.0.10",
     "pixi.js": "^8.18.1",
     "react": "^19.2.5",
-    "react-dom": "^19.2.5"
+    "react-dom": "^19.2.5",
+    "upng-js": "^2.1.0",
+    "wasm-webp": "^0.1.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/jszip": "^3.4.0",
     "@types/node": "^24.12.2",
+    "@types/omggif": "^1.0.5",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",

@@ -2,19 +2,21 @@ import React, { useRef, useEffect } from 'react';
 import * as PIXI from 'pixi.js';
 import { ParticleEngine } from '../effects/engine';
 import type { EffectType, CropShape, EffectParams } from '../effects/types';
+import type { GifData } from '../lib/gif-decoder';
 
 interface Props {
   image: HTMLImageElement | null;
+  gifData: GifData | null;
   effect: EffectType;
   shape: CropShape;
   params: EffectParams;
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
-  noImageMode?: boolean;
 }
 
 const SIZE = 512;
 
-const PreviewCanvas: React.FC<Props> = ({ image, effect, shape, params, canvasRef, noImageMode }) => {
+const PreviewCanvas: React.FC<Props> = ({ image, gifData, effect, shape, params, canvasRef }) => {
+  const noImageMode = !image && !gifData;
   const containerRef = useRef<HTMLDivElement>(null);
   const appRef = useRef<PIXI.Application | null>(null);
   const engineRef = useRef(new ParticleEngine());
@@ -24,6 +26,11 @@ const PreviewCanvas: React.FC<Props> = ({ image, effect, shape, params, canvasRe
   const glowGfxRef = useRef<PIXI.Graphics | null>(null);
   const rafRef = useRef<number>(0);
   const initRef = useRef(false);
+  // GIF animation state
+  const gifTexturesRef = useRef<PIXI.Texture[]>([]);
+  const gifFrameRef = useRef(0);
+  const gifTimerRef = useRef(0);
+  const gifLastTimeRef = useRef(0);
 
   // Single init + animation effect
   useEffect(() => {
@@ -85,21 +92,52 @@ const PreviewCanvas: React.FC<Props> = ({ image, effect, shape, params, canvasRe
         glowGfxRef.current = null;
       }
 
+      // Clean up old GIF textures
+      for (const tex of gifTexturesRef.current) {
+        tex.destroy(true);
+      }
+      gifTexturesRef.current = [];
+      gifFrameRef.current = 0;
+      gifTimerRef.current = 0;
+      gifLastTimeRef.current = 0;
+
       cancelAnimationFrame(rafRef.current);
 
-      // No-image mode: just effects on transparent background
-      if (!image && !noImageMode) return;
-
-      const hasImage = !!image;
+      const hasImage = !!image || !!gifData;
       const imgSize = SIZE;
 
       if (hasImage) {
-        const texture = PIXI.Texture.from(image!);
-        const sprite = new PIXI.Sprite(texture);
-        sprite.anchor.set(0.5);
-        sprite.position.set(SIZE / 2, SIZE / 2);
-        const scale = Math.max(imgSize / image!.width, imgSize / image!.height);
-        sprite.scale.set(scale);
+        let sprite: PIXI.Sprite;
+
+        if (gifData) {
+          // Create textures from GIF frames
+          const textures: PIXI.Texture[] = [];
+          for (const frame of gifData.frames) {
+            const canvas = document.createElement('canvas');
+            canvas.width = gifData.width;
+            canvas.height = gifData.height;
+            const ctx = canvas.getContext('2d')!;
+            ctx.putImageData(frame.imageData, 0, 0);
+            const tex = PIXI.Texture.from(canvas);
+            textures.push(tex);
+          }
+          gifTexturesRef.current = textures;
+
+          sprite = new PIXI.Sprite(textures[0]);
+          sprite.anchor.set(0.5);
+          sprite.position.set(SIZE / 2, SIZE / 2);
+          const scale = Math.max(imgSize / gifData.width, imgSize / gifData.height);
+          sprite.scale.set(scale);
+        } else if (image) {
+          const texture = PIXI.Texture.from(image);
+          sprite = new PIXI.Sprite(texture);
+          sprite.anchor.set(0.5);
+          sprite.position.set(SIZE / 2, SIZE / 2);
+          const scale = Math.max(imgSize / image.width, imgSize / image.height);
+          sprite.scale.set(scale);
+        } else {
+          return;
+        }
 
         // Create mask — inscribed circle or full rectangle
         const mask = new PIXI.Graphics();
@@ -118,10 +156,12 @@ const PreviewCanvas: React.FC<Props> = ({ image, effect, shape, params, canvasRe
 
       // Create glow layer (blurred, underneath) — soft light halo
       const glowGfx = new PIXI.Graphics();
-      glowGfx.blendMode = 'add';
-      if (maskRef.current) glowGfx.mask = maskRef.current;
-      const blurFilter = new PIXI.BlurFilter({ strength: 8, quality: 3 });
-      glowGfx.filters = [blurFilter];
+      if (effect !== 'solidring' && effect !== 'ring') {
+        glowGfx.blendMode = 'add';
+        if (maskRef.current) glowGfx.mask = maskRef.current;
+        const blurFilter = new PIXI.BlurFilter({ strength: 8, quality: 3 });
+        glowGfx.filters = [blurFilter];
+      }
       app.stage.addChild(glowGfx);
       glowGfxRef.current = glowGfx;
 
@@ -142,8 +182,33 @@ const PreviewCanvas: React.FC<Props> = ({ image, effect, shape, params, canvasRe
       // Animation loop — draw to both glow (blurred) and sharp layers
       const tick = () => {
         if (destroyed) return;
+
+        // GIF frame animation
+        if (gifTexturesRef.current.length > 1 && gifData) {
+          const now = performance.now();
+          if (gifLastTimeRef.current === 0) gifLastTimeRef.current = now;
+          const elapsed = now - gifLastTimeRef.current;
+          gifLastTimeRef.current = now;
+          gifTimerRef.current += elapsed;
+
+          const currentFrame = gifData.frames[gifFrameRef.current];
+          if (gifTimerRef.current >= currentFrame.delay) {
+            gifTimerRef.current -= currentFrame.delay;
+            gifFrameRef.current = (gifFrameRef.current + 1) % gifTexturesRef.current.length;
+            if (imageSpriteRef.current) {
+              imageSpriteRef.current.texture = gifTexturesRef.current[gifFrameRef.current];
+            }
+          }
+        }
+
         engine.update(SIZE, SIZE, imgSize);
-        engine.draw(glowGfx, SIZE, SIZE, imgSize);   // blurred glow
+        // For ring/solidring, skip glow layer to avoid additive double-draw
+        // that washes out the rainbow colors to white
+        if (effect !== 'ring' && effect !== 'solidring') {
+          engine.draw(glowGfx, SIZE, SIZE, imgSize);   // blurred glow
+        } else {
+          glowGfx.clear();
+        }
         engine.draw(effectsGfx, SIZE, SIZE, imgSize); // sharp cores
         rafRef.current = requestAnimationFrame(tick);
       };
@@ -155,15 +220,19 @@ const PreviewCanvas: React.FC<Props> = ({ image, effect, shape, params, canvasRe
     return () => {
       destroyed = true;
       cancelAnimationFrame(rafRef.current);
+      // Clean up GIF textures
+      for (const tex of gifTexturesRef.current) {
+        tex.destroy(true);
+      }
+      gifTexturesRef.current = [];
       // Reset init flag so a subsequent mount can re-create the app
-      // (handles React strict mode double-mount)
       if (appRef.current) {
         appRef.current.destroy(true);
         appRef.current = null;
       }
       initRef.current = false;
     };
-  }, [image, effect, shape, canvasRef, noImageMode]);
+  }, [image, gifData, effect, shape, canvasRef]);
 
   // Live-update params (speed, density, intensity, colors) without restarting animation
   useEffect(() => {
@@ -174,6 +243,10 @@ const PreviewCanvas: React.FC<Props> = ({ image, effect, shape, params, canvasRe
   useEffect(() => {
     return () => {
       cancelAnimationFrame(rafRef.current);
+      for (const tex of gifTexturesRef.current) {
+        tex.destroy(true);
+      }
+      gifTexturesRef.current = [];
       if (appRef.current) {
         appRef.current.destroy(true);
         appRef.current = null;

@@ -106,6 +106,9 @@ export class ParticleEngine {
   // Ring state
   private ringTime = 0;
 
+  // SolidRing state
+  private solidRingAngle = 0;
+
   setEffect(e: EffectType) { this.effect = e; this.particles = []; this.lightningBolts = []; }
   setShape(s: CropShape) { this.shape = s; }
   setParams(p: EffectParams) { this.params = p; }
@@ -136,6 +139,7 @@ export class ParticleEngine {
       case 'firefly':   this.updateFirefly(canvasW, canvasH, imgSize); break;
       case 'rain':      this.updateRain(canvasW, canvasH, imgSize); break;
       case 'ring':      this.updateRing(canvasW, canvasH, imgSize); break;
+      case 'solidring': this.updateSolidRing(canvasW, canvasH, imgSize); break;
     }
   }
 
@@ -163,6 +167,7 @@ export class ParticleEngine {
       case 'firefly':   this.drawFirefly(g, canvasW, canvasH, imgSize); break;
       case 'rain':      this.drawRain(g, canvasW, canvasH, imgSize); break;
       case 'ring':      this.drawRing(g, canvasW, canvasH, imgSize); break;
+      case 'solidring': this.drawSolidRing(g, canvasW, canvasH, imgSize); break;
     }
   }
 
@@ -2197,8 +2202,9 @@ export class ParticleEngine {
   private drawRing(g: PIXI.Graphics, cw: number, ch: number, sz: number) {
     const cx = cw / 2, cy = ch / 2;
     const time = this.ringTime;
-    const ringWidth = 6 + (this.params.intensity / 100) * 10;
-    const r = this.shape === 'circle' ? sz / 2 - ringWidth : sz / 2 * 0.9;
+    const ringWidth = 10 + (this.params.intensity / 100) * 30;
+    // Ring center: outer edge = sz/2 (贴边), so center = sz/2 - ringWidth/2
+    const r = sz / 2 - ringWidth / 2;
     const steps = 120;
 
     const rainbowColors = [
@@ -2210,11 +2216,13 @@ export class ParticleEngine {
       this.params.color,
     ];
 
-    // Draw multiple glow layers
-    for (let layer = 3; layer >= 0; layer--) {
+    // Inner glow (behind the main ring, slightly wider + blurred feel)
+    for (let layer = 1; layer >= 0; layer--) {
+      // layer 1 = inner glow (larger width, lower alpha, shifted inward)
+      // layer 0 = main ring
       const layerR = r - layer * 2;
-      const layerWidth = ringWidth + layer * 4;
-      const layerAlpha = layer === 0 ? 0.8 : 0.15 / layer;
+      const layerWidth = layer === 0 ? ringWidth : ringWidth + 6;
+      const layerAlpha = layer === 0 ? 0.9 : 0.25;
 
       for (let i = 0; i < steps; i++) {
         const t = i / steps;
@@ -2241,15 +2249,53 @@ export class ParticleEngine {
         g.stroke({ width: layerWidth, color, alpha: layerAlpha, cap: 'round' });
       }
     }
-
-    // Inner highlight
-    const highlightAlpha = 0.1 + 0.05 * Math.sin(time * 3);
-    g.circle(cx, cy, r + ringWidth * 0.3).stroke({
-      color: 0xffffff,
-      alpha: highlightAlpha,
-      width: 1,
-    });
   }
+  // ════════════════════════════════════════════════════════════════════
+  // SOLID RING
+  // ════════════════════════════════════════════════════════════════════
+
+  private updateSolidRing(_cw: number, _ch: number, _sz: number) {
+    const spd = this.params.speed / 50;
+    this.solidRingAngle += spd * 0.03;
+  }
+
+  private drawSolidRing(g: PIXI.Graphics, cw: number, ch: number, sz: number) {
+    const cx = cw / 2, cy = ch / 2;
+    const r = sz / 2;
+    const lineWidth = 4 + (this.params.intensity / 100) * 36;
+    const steps = 720;
+    const time = this.solidRingAngle;
+
+    // Vivid gradient: red → orange → green → blue
+    const rainbowColors = [
+      '#ff0040',
+      '#ff8000',
+      '#00ff80',
+      '#00b0ff',
+      '#ff0040',
+    ];
+
+    const ringR = r - lineWidth / 2;
+    for (let i = 0; i < steps; i++) {
+      const t = i / steps;
+      const colorT = (t + time * 0.3) % 1;
+      const colorIdx = colorT * (rainbowColors.length - 1);
+      const ci = Math.floor(colorIdx);
+      const cf = colorIdx - ci;
+      const segColor = lerpColor(
+        rainbowColors[ci],
+        rainbowColors[Math.min(ci + 1, rainbowColors.length - 1)],
+        cf
+      );
+
+      const a1 = t * Math.PI * 2;
+      const a2 = (t + 1 / steps) * Math.PI * 2;
+      g.beginPath();
+      g.arc(cx, cy, ringR, a1, a2);
+      g.stroke({ width: lineWidth, color: segColor, alpha: 1 });
+    }
+  }
+
   clear() {
     this.particles = [];
     this.lightningBolts = [];
@@ -2280,5 +2326,6 @@ export class ParticleEngine {
     this.fireflyTime = 0;
     this.rainTime = 0;
     this.ringTime = 0;
+    this.solidRingAngle = 0;
   }
 }

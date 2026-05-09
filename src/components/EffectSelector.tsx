@@ -28,6 +28,7 @@ const effects: { type: EffectType; icon: string; label: string }[] = [
   { type: 'firefly',   icon: '🪲', label: '萤火虫' },
   { type: 'rain',      icon: '🌧️', label: '雨' },
   { type: 'ring',      icon: '💍', label: '光环' },
+  { type: 'solidring', icon: '⭕', label: '实心环' },
 ];
 
 const EffectSelector: React.FC<Props> = ({ selected, onChange }) => {
