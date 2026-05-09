@@ -37,11 +37,11 @@ const PreviewCanvas: React.FC<Props> = ({ image, effect, shape, params, canvasRe
         await app.init({
           width: SIZE,
           height: SIZE,
-          background: noImageMode ? 0x00000000 : 0x0a0a0f,
+          background: noImageMode ? 0x010101 : 0x0a0a0f,
           antialias: true,
           resolution: 1,
           preserveDrawingBuffer: true,
-          backgroundAlpha: noImageMode ? 0 : 1,
+          backgroundAlpha: noImageMode ? 1 : 1,
         });
         if (destroyed) { app.destroy(true); return; }
         appRef.current = app;
