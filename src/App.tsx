@@ -17,6 +17,29 @@ import './App.css';
 // Detect browser capabilities
 const supportsMediaRecorder = typeof MediaRecorder !== 'undefined';
 const supportsWebWorkers = typeof Worker !== 'undefined';
+const GIF_TRANSPARENT_KEY = 0xff00ff;
+
+function applyCircleAlphaMask(ctx: CanvasRenderingContext2D, w: number, h: number) {
+  ctx.save();
+  ctx.globalCompositeOperation = 'destination-in';
+  ctx.beginPath();
+  ctx.arc(w / 2, h / 2, Math.min(w, h) / 2, 0, Math.PI * 2);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+function snapTransparentToGifKey(imageData: ImageData) {
+  const px = imageData.data;
+  for (let i = 0; i < px.length; i += 4) {
+    if (px[i + 3] < 8) {
+      px[i] = 255;
+      px[i + 1] = 0;
+      px[i + 2] = 255;
+      px[i + 3] = 255;
+    }
+  }
+}
 
 function App() {
   const [image, setImage] = useState<HTMLImageElement | null>(null);
@@ -118,7 +141,7 @@ function App() {
       width: canvas.width,
       height: canvas.height,
       workerScript: import.meta.env.BASE_URL + 'gif.worker.js',
-      transparent: (!image && !gifData) ? 0xff00ff : undefined,
+      transparent: (!image && !gifData) || shape === 'circle' ? GIF_TRANSPARENT_KEY : undefined,
     });
 
     const frameCount = Math.floor((duration / 1000) * fps);
@@ -129,7 +152,7 @@ function App() {
     // Then snap near-black pixels to magenta (the gif.js transparent color key).
     let offscreen: HTMLCanvasElement | null = null;
     let offCtx: CanvasRenderingContext2D | null = null;
-    if (!image && !gifData) {
+    if (!image && !gifData || shape === 'circle') {
       offscreen = document.createElement('canvas');
       offscreen.width = canvas.width;
       offscreen.height = canvas.height;
@@ -139,21 +162,27 @@ function App() {
 
     // Capture frames
     for (let i = 0; i < frameCount; i++) {
-      if (!image && !gifData && offscreen && offCtx) {
-        // 1. Fill with black
-        offCtx.fillStyle = '#000000';
-        offCtx.fillRect(0, 0, offscreen.width, offscreen.height);
-        // 2. Draw WebGL canvas — semi-transparent edges blend with black (dark, not pink)
+      if (offscreen && offCtx) {
+        offCtx.clearRect(0, 0, offscreen.width, offscreen.height);
+        if (!image && !gifData) {
+          offCtx.fillStyle = '#000000';
+          offCtx.fillRect(0, 0, offscreen.width, offscreen.height);
+        }
         offCtx.drawImage(canvas, 0, 0);
-        // 3. Near-black pixels → magenta (transparent); others → keep color
+        if (shape === 'circle') {
+          applyCircleAlphaMask(offCtx, offscreen.width, offscreen.height);
+        }
         const imgData = offCtx.getImageData(0, 0, offscreen.width, offscreen.height);
-        const px = imgData.data;
-        for (let j = 0; j < px.length; j += 4) {
-          if (Math.max(px[j], px[j + 1], px[j + 2]) < BG_THRESHOLD) {
-            // Background → exact magenta for gif.js transparency
-            px[j] = 255; px[j + 1] = 0; px[j + 2] = 255;
+        if (!image && !gifData) {
+          const px = imgData.data;
+          for (let j = 0; j < px.length; j += 4) {
+            if (Math.max(px[j], px[j + 1], px[j + 2]) < BG_THRESHOLD) {
+              px[j] = 255; px[j + 1] = 0; px[j + 2] = 255;
+            }
+            px[j + 3] = 255;
           }
-          px[j + 3] = 255;
+        } else if (shape === 'circle') {
+          snapTransparentToGifKey(imgData);
         }
         offCtx.putImageData(imgData, 0, 0);
         gif.addFrame(offscreen, { copy: true, delay: frameDelay });
@@ -183,7 +212,7 @@ function App() {
 
       gif.render();
     });
-  }, [effect, downloadBlob, image, gifData]);
+  }, [effect, downloadBlob, image, gifData, shape]);
 
   // Export as PNG sequence frames (most compatible)
   // Export as APNG (animated PNG with full alpha support)
@@ -205,12 +234,15 @@ function App() {
     const offCtx = offscreen.getContext('2d')!;
 
     for (let i = 0; i < frameCount; i++) {
+      offCtx.clearRect(0, 0, w, h);
       if (!image && !gifData) {
         // Transparent background — just draw the WebGL canvas directly
-        offCtx.clearRect(0, 0, w, h);
         offCtx.drawImage(canvas, 0, 0);
       } else {
         offCtx.drawImage(canvas, 0, 0);
+      }
+      if (shape === 'circle') {
+        applyCircleAlphaMask(offCtx, w, h);
       }
       const imgData = offCtx.getImageData(0, 0, w, h);
       // Copy the pixel data buffer (UPNG needs ArrayBuffer)
@@ -227,7 +259,7 @@ function App() {
     const blob = new Blob([apng], { type: 'image/apng' });
     setExportProgress(1);
     downloadBlob(blob, `avatar-${effect}.apng`);
-  }, [effect, downloadBlob, image, gifData]);
+  }, [effect, downloadBlob, image, gifData, shape]);
 
   // Export as animated WebP (single .webp file) using wasm-webp
   const exportWebP = useCallback(async (canvas: HTMLCanvasElement) => {
@@ -247,6 +279,9 @@ function App() {
     for (let i = 0; i < frameCount; i++) {
       ctx.clearRect(0, 0, w, h);
       ctx.drawImage(canvas, 0, 0);
+      if (shape === 'circle') {
+        applyCircleAlphaMask(ctx, w, h);
+      }
       const imgData = ctx.getImageData(0, 0, w, h);
       frames.push({ data: new Uint8Array(imgData.data), duration: frameDelay });
       setExportProgress((i + 1) / frameCount * 0.7);
@@ -259,7 +294,7 @@ function App() {
     setExportProgress(1);
     const blob = new Blob([webpData.buffer as ArrayBuffer], { type: 'image/webp' });
     downloadBlob(blob, `avatar-${effect}.webp`);
-  }, [effect, downloadBlob]);
+  }, [effect, downloadBlob, shape]);
 
   const handleExport = useCallback(async () => {
     const canvas = canvasRef.current;

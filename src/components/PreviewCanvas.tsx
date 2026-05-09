@@ -45,11 +45,11 @@ const PreviewCanvas: React.FC<Props> = ({ image, gifData, effect, shape, params,
         await app.init({
           width: SIZE,
           height: SIZE,
-          background: noImageMode ? 0x000000 : 0x0a0a0f,
+          background: 0x000000,
           antialias: true,
           resolution: 1,
           preserveDrawingBuffer: true,
-          backgroundAlpha: noImageMode ? 0 : 1,
+          backgroundAlpha: shape === 'circle' || noImageMode ? 0 : 1,
         });
         if (destroyed) { app.destroy(true); return; }
         appRef.current = app;
