@@ -2473,9 +2473,9 @@ export class ParticleEngine {
     while (this.particles.length < targetCount) {
       let x: number;
       if (this.shape === 'circle') {
-        const edgeT = 0.55 + Math.random() * 0.4;
-        const ep = this.getEdgePoint(cw, ch, sz, edgeT % 1);
-        x = ep.x + (Math.random() - 0.5) * r * 0.12;
+        const sideBias = Math.random() < 0.5 ? -1 : 1;
+        const sideSpread = 0.55 + Math.random() * 0.38;
+        x = cx + sideBias * r * sideSpread + (Math.random() - 0.5) * r * 0.12;
       } else {
         x = cx + (Math.random() - 0.5) * sz * 0.92;
       }
