@@ -2311,36 +2311,88 @@ export class ParticleEngine {
 
   private updateAurora(cw: number, ch: number, sz: number) {
     this.auroraTime += 0.016 * (this.params.speed / 50);
+    const cx = cw / 2;
+    const cy = ch / 2;
+    const r = sz / 2;
     const targetCount = Math.floor(this.params.density * 1.5) + 30;
 
     while (this.particles.length < targetCount) {
+      const x = this.shape === 'circle'
+        ? cx + (Math.random() - 0.5) * sz * 0.9
+        : cx + (Math.random() - 0.5) * sz;
+      const y = cy - r * (0.78 - Math.random() * 0.28);
+      const band = Math.random();
       this.particles.push({
-        x: Math.random() * cw,
-        y: ch / 2 - sz / 2 + Math.random() * sz * 0.4,
+        x,
+        y,
         vx: 0, vy: 0,
         life: 300 + Math.random() * 500,
         maxLife: 800,
-        size: 20 + Math.random() * 40,
+        size: 34 + Math.random() * 52,
         color: Math.random() > 0.5 ? this.params.color : this.params.secondaryColor,
-        alpha: 0.05 + Math.random() * 0.1,
-        swayPhase: Math.random() * Math.PI * 2,
-        swaySpeed: 0.3 + Math.random() * 0.7,
+        alpha: 0.04 + Math.random() * 0.06,
+        swayPhase: Math.random() * Math.PI * 2 + band * Math.PI,
+        swaySpeed: 0.22 + Math.random() * 0.45,
       });
     }
 
     this.particles = this.particles.filter(p => {
-      p.x += Math.sin(this.auroraTime * (p.swaySpeed ?? 0.5) + (p.swayPhase ?? 0)) * 1.5;
-      p.y += Math.sin(this.auroraTime * 0.3 + (p.swayPhase ?? 0)) * 0.3;
-      p.alpha = (0.05 + 0.08 * Math.sin(this.auroraTime * 2 + (p.swayPhase ?? 0))) * (p.life / (p.maxLife ?? 800));
+      const wave = Math.sin(this.auroraTime * (p.swaySpeed ?? 0.4) + (p.swayPhase ?? 0));
+      const drift = Math.sin(this.auroraTime * 0.22 + (p.swayPhase ?? 0) * 0.7);
+      p.x += wave * 0.85 + drift * 0.45;
+      p.y += Math.sin(this.auroraTime * 0.18 + (p.swayPhase ?? 0)) * 0.12;
+      p.alpha = (
+        0.035
+        + 0.05 * (0.5 + 0.5 * Math.sin(this.auroraTime * 1.3 + (p.swayPhase ?? 0)))
+      ) * (p.life / (p.maxLife ?? 800));
       p.life -= 1;
       return p.life > 0;
     });
   }
 
-  private drawAurora(g: PIXI.Graphics, _cw: number, _ch: number, _sz: number) {
+  private drawAurora(g: PIXI.Graphics, cw: number, ch: number, sz: number) {
+    const cx = cw / 2;
+    const cy = ch / 2;
+    const r = sz / 2;
+    const curtainCount = 4;
+    const segments = 28;
+
+    for (let layer = 0; layer < curtainCount; layer++) {
+      const layerT = curtainCount <= 1 ? 0 : layer / (curtainCount - 1);
+      const yBase = cy - r * (0.74 - layerT * 0.11);
+      const thickness = r * (0.18 + layerT * 0.06);
+      const span = sz * (0.74 + layerT * 0.08);
+      const pointsTop: Array<{ x: number; y: number }> = [];
+      const pointsBottom: Array<{ x: number; y: number }> = [];
+      const layerColor = layer % 2 === 0 ? hexToNum(this.params.color) : hexToNum(this.params.secondaryColor);
+
+      for (let i = 0; i <= segments; i++) {
+        const t = i / segments;
+        const x = cx - span / 2 + span * t;
+        const sway =
+          Math.sin(this.auroraTime * (0.5 + layer * 0.08) + t * Math.PI * (2.4 + layer * 0.35) + layer * 1.15) * (10 + layer * 5) +
+          Math.sin(this.auroraTime * 0.85 + t * Math.PI * 5.2 + layer * 0.6) * 5;
+        const taper = 0.55 + 0.45 * Math.sin(t * Math.PI);
+        const crest = yBase + sway * 0.32;
+        pointsTop.push({ x, y: crest - thickness * taper * 0.52 });
+        pointsBottom.push({ x, y: crest + thickness * taper });
+      }
+
+      g.moveTo(pointsTop[0].x, pointsTop[0].y);
+      for (let i = 1; i < pointsTop.length; i++) {
+        g.lineTo(pointsTop[i].x, pointsTop[i].y);
+      }
+      for (let i = pointsBottom.length - 1; i >= 0; i--) {
+        g.lineTo(pointsBottom[i].x, pointsBottom[i].y);
+      }
+      g.closePath();
+      g.fill({ color: layerColor, alpha: 0.038 + layerT * 0.018 });
+    }
+
     for (const p of this.particles) {
       const pColor = hexToNum(p.color);
-      g.ellipse(p.x, p.y, p.size, p.size * 0.3).fill({ color: pColor, alpha: p.alpha });
+      const stretch = 0.2 + 0.08 * Math.sin(this.auroraTime + (p.swayPhase ?? 0));
+      g.ellipse(p.x, p.y, p.size, p.size * stretch).fill({ color: pColor, alpha: p.alpha });
     }
   }
 
@@ -2419,9 +2471,14 @@ export class ParticleEngine {
     const targetCount = Math.floor(this.params.density * 2) + 40;
 
     while (this.particles.length < targetCount) {
-      const x = this.shape === 'circle'
-        ? cx + (Math.random() - 0.5) * r * 1.6
-        : cx + (Math.random() - 0.5) * sz * 0.92;
+      let x: number;
+      if (this.shape === 'circle') {
+        const edgeT = 0.55 + Math.random() * 0.4;
+        const ep = this.getEdgePoint(cw, ch, sz, edgeT % 1);
+        x = ep.x + (Math.random() - 0.5) * r * 0.12;
+      } else {
+        x = cx + (Math.random() - 0.5) * sz * 0.92;
+      }
       const y = cy - r - Math.random() * r * 0.18;
       this.particles.push({
         x,
