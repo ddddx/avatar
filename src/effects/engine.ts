@@ -2573,7 +2573,9 @@ export class ParticleEngine {
 
       if (this.shape === 'circle') {
         const dx = p.x - cx, dy = p.y - cy;
-        if (dx * dx + dy * dy > r * r) {
+        const insideCircle = dx * dx + dy * dy <= r * r;
+        const hasEnteredRainBand = p.y >= cy - r * 0.98;
+        if (!insideCircle && hasEnteredRainBand) {
           p.life = 0;
         }
       } else if (!this.isInsideShapePoint(p.x, p.y, cx, cy, r)) {
