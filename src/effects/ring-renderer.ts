@@ -15,6 +15,7 @@ const GOOGLE_ONE_SEGMENTS = [
   { color: '#34A853', degrees: 105 },
   { color: '#FBBC05', degrees: 45 },
 ] as const;
+const SMOOTH_GRADIENT_SAMPLES = 256;
 
 export function isRingEffect(effect: EffectType) {
   return RING_EFFECTS.has(effect);
@@ -88,10 +89,37 @@ function appendRingPath(
   traceRoundedRectPath(ctx, inset, inset, innerWidth, innerHeight, innerRadius);
 }
 
-function addPaletteStops(gradient: CanvasGradient, colors: readonly string[]) {
-  const lastIndex = colors.length - 1;
-  for (let i = 0; i <= lastIndex; i++) {
-    gradient.addColorStop(i / lastIndex, colors[i]);
+function hexToRgb(hex: string) {
+  const normalized = hex.replace('#', '');
+  return {
+    r: parseInt(normalized.slice(0, 2), 16),
+    g: parseInt(normalized.slice(2, 4), 16),
+    b: parseInt(normalized.slice(4, 6), 16),
+  };
+}
+
+function lerpHexColor(a: string, b: string, t: number) {
+  const c1 = hexToRgb(a);
+  const c2 = hexToRgb(b);
+  const r = Math.round(c1.r + (c2.r - c1.r) * t);
+  const g = Math.round(c1.g + (c2.g - c1.g) * t);
+  const bValue = Math.round(c1.b + (c2.b - c1.b) * t);
+  return `rgb(${r}, ${g}, ${bValue})`;
+}
+
+function addSampledPaletteStops(gradient: CanvasGradient, colors: readonly string[]) {
+  const paletteSpan = colors.length - 1;
+  for (let i = 0; i <= SMOOTH_GRADIENT_SAMPLES; i++) {
+    const t = i / SMOOTH_GRADIENT_SAMPLES;
+    const scaled = t * paletteSpan;
+    const index = Math.floor(scaled);
+    const blend = scaled - index;
+    const color = lerpHexColor(
+      colors[index],
+      colors[Math.min(index + 1, paletteSpan)],
+      blend,
+    );
+    gradient.addColorStop(t, color);
   }
 }
 
@@ -105,12 +133,12 @@ function createRingGradient(
   const gradient = ctx.createConicGradient(phase * Math.PI * 2, width / 2, height / 2);
 
   if (effect === 'solidring') {
-    addPaletteStops(gradient, SOLID_RING_COLORS);
+    addSampledPaletteStops(gradient, SOLID_RING_COLORS);
     return gradient;
   }
 
   if (effect === 'disc') {
-    addPaletteStops(gradient, DISC_COLORS);
+    addSampledPaletteStops(gradient, DISC_COLORS);
     return gradient;
   }
 
