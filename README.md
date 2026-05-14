@@ -6,10 +6,13 @@
 
 ## 功能
 
-- 🎨 **23 种粒子特效**：闪电、火焰、光晕、轨道、护盾、冰霜、涟漪、花瓣、星尘、棱镜、漩涡、烟花、金色、旋转、加载器、矩阵、泡泡、极光、萤火虫、雨滴、实心环、光盘、Google One 环
+- 🎨 **23 种动态特效**：闪电、火焰、炫光、环形粒子、能量护盾、冰霜、水波纹、花瓣雨、星尘、棱镜光、旋风、烟花、金粉、旋转、加载中、矩阵雨、气泡、极光、萤火虫、雨、实心环、光盘、Google One 环
 - 📷 **支持静态图片和 GIF 动图**导入
 - 🔄 **无图模式**：不传图片也能玩特效
-- 📐 **圆形/方形裁剪**，实时预览
+- 📐 **圆形 / 圆角矩形裁切**，实时预览
+- 🪞 **支持左右镜像、上下镜像**
+- 🔁 **环类特效支持正转 / 反转**：实心环、光盘、 Google One 环
+- 🧪 **预览与导出统一环渲染逻辑**：减少环类特效的拼缝、脏点和首尾不一致问题
 
 ## 导出格式
 
@@ -23,7 +26,8 @@
 ## 技术栈
 
 - React + TypeScript + Vite
-- [PIXI.js](https://pixijs.com/) — WebGL 渲染
+- [PIXI.js](https://pixijs.com/) — 大部分粒子特效的实时渲染
+- Canvas 2D — 环类特效的统一预览与导出渲染
 - [omggif](https://github.com/deanm/omggif) — GIF 解码
 - [gif.js](https://github.com/jnordberg/gif.js) — GIF 编码
 - [upng-js](https://github.com/nicgirault/upng-js) — APNG 编码
