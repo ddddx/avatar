@@ -74,6 +74,7 @@ function snapTransparentToGifKey(imageData: ImageData) {
 
 type ExportDrivenCanvas = HTMLCanvasElement & {
   __avatarSetExportFrameStep?: (deltaMs: number | null) => void;
+  __avatarSetRingLoopProgress?: (progress: number | null) => void;
   __avatarRenderFrame?: () => void;
 };
 
@@ -222,6 +223,7 @@ function App() {
       // Capture frames
       for (let i = 0; i < frameCount; i++) {
         if (RING_EFFECTS.has(effect)) {
+          exportCanvas.__avatarSetRingLoopProgress?.(i / frameCount);
           exportCanvas.__avatarRenderFrame?.();
         }
 
@@ -258,6 +260,7 @@ function App() {
         }
       }
     } finally {
+      exportCanvas.__avatarSetRingLoopProgress?.(null);
       exportCanvas.__avatarSetExportFrameStep?.(null);
     }
 
@@ -309,6 +312,7 @@ function App() {
 
       for (let i = 0; i < frameCount; i++) {
         if (RING_EFFECTS.has(effect)) {
+          exportCanvas.__avatarSetRingLoopProgress?.(i / frameCount);
           exportCanvas.__avatarRenderFrame?.();
         }
 
@@ -327,6 +331,7 @@ function App() {
         }
       }
     } finally {
+      exportCanvas.__avatarSetRingLoopProgress?.(null);
       exportCanvas.__avatarSetExportFrameStep?.(null);
     }
 
@@ -361,6 +366,7 @@ function App() {
 
       for (let i = 0; i < frameCount; i++) {
         if (RING_EFFECTS.has(effect)) {
+          exportCanvas.__avatarSetRingLoopProgress?.(i / frameCount);
           exportCanvas.__avatarRenderFrame?.();
         }
 
@@ -377,6 +383,7 @@ function App() {
         }
       }
     } finally {
+      exportCanvas.__avatarSetRingLoopProgress?.(null);
       exportCanvas.__avatarSetExportFrameStep?.(null);
     }
 

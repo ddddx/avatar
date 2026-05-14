@@ -45,6 +45,23 @@ function drawRingQuad(
   ], true).fill({ color, alpha: 1 });
 }
 
+function drawCircularRingSegment(
+  g: PIXI.Graphics,
+  cx: number,
+  cy: number,
+  outerRadius: number,
+  innerRadius: number,
+  angle1: number,
+  angle2: number,
+  color: number,
+) {
+  const p1Outer = { x: cx + Math.cos(angle1) * outerRadius, y: cy + Math.sin(angle1) * outerRadius };
+  const p2Outer = { x: cx + Math.cos(angle2) * outerRadius, y: cy + Math.sin(angle2) * outerRadius };
+  const p2Inner = { x: cx + Math.cos(angle2) * innerRadius, y: cy + Math.sin(angle2) * innerRadius };
+  const p1Inner = { x: cx + Math.cos(angle1) * innerRadius, y: cy + Math.sin(angle1) * innerRadius };
+  drawRingQuad(g, p1Outer, p2Outer, p2Inner, p1Inner, color);
+}
+
 function getSquareTrackCornerRadius(outerHalf: number, half: number) {
   const inset = outerHalf - half;
   if (inset <= 0) return SQUARE_CORNER_RADIUS + Math.abs(inset);
@@ -159,6 +176,14 @@ export class ParticleEngine {
     this.fixedDeltaSeconds = Math.max(deltaMs, 0) / 1000;
     this.frameDeltaSeconds = this.fixedDeltaSeconds;
     this.lastUpdateAt = 0;
+  }
+  setRingLoopProgress(progress: number | null) {
+    if (progress == null) return;
+    const direction = this.params.direction === 'reverse' ? -1 : 1;
+    const phase = this.getWrappedPhase(progress * direction);
+    this.solidRingPhase = phase;
+    this.discPhase = phase;
+    this.googleOnePhase = phase;
   }
 
   update(canvasW: number, canvasH: number, imgSize: number) {
@@ -2646,6 +2671,8 @@ export class ParticleEngine {
     const r = sz / 2;
     const lineWidth = 4 + (this.params.intensity / 100) * 36;
     const steps = 1920;
+    const outerRadius = r;
+    const innerRadius = Math.max(r - lineWidth, 0);
     // Vivid gradient: red → orange → green → blue
     const rainbowColors = [
       '#ff0040',
@@ -2654,8 +2681,6 @@ export class ParticleEngine {
       '#00b0ff',
       '#ff0040',
     ];
-
-    const ringR = r - lineWidth / 2;
 
     if (this.shape === 'square') {
       const outerHalf = Math.min(r, sz / 2);
@@ -2697,9 +2722,7 @@ export class ParticleEngine {
 
       const a1 = t * Math.PI * 2;
       const a2 = (t + 1 / steps) * Math.PI * 2;
-      g.beginPath();
-      g.arc(cx, cy, ringR, a1, a2);
-      g.stroke({ width: lineWidth, color: segColor, alpha: 1 });
+      drawCircularRingSegment(g, cx, cy, outerRadius, innerRadius, a1, a2, segColor);
     }
   }
 
@@ -2713,7 +2736,8 @@ export class ParticleEngine {
     const r = sz / 2;
     // Ring width: 15-50px based on intensity
     const ringWidth = 15 + (this.params.intensity / 100) * 35;
-    const ringR = r - ringWidth / 2;
+    const outerRadius = r;
+    const innerRadius = Math.max(r - ringWidth, 0);
 
     // 1. Continuous rainbow gradient ring (Google One style)
     // Palette: red → orange → yellow → green → blue → purple → red
@@ -2758,15 +2782,7 @@ export class ParticleEngine {
           discColors[Math.min(ci + 1, discColors.length - 1)],
           cf,
         );
-
-        const x1 = cx + Math.cos(angle1) * ringR;
-        const y1 = cy + Math.sin(angle1) * ringR;
-        const x2 = cx + Math.cos(angle2) * ringR;
-        const y2 = cy + Math.sin(angle2) * ringR;
-
-        g.moveTo(x1, y1);
-        g.lineTo(x2, y2);
-        g.stroke({ width: ringWidth, color: segColor, alpha: 1 });
+        drawCircularRingSegment(g, cx, cy, outerRadius, innerRadius, angle1, angle2, segColor);
       }
     }
   }
@@ -2792,7 +2808,8 @@ export class ParticleEngine {
     const cy = ch / 2;
     const r = sz / 2;
     const ringWidth = 28 + (this.params.intensity / 100) * 24;
-    const ringR = r - ringWidth / 2;
+    const outerRadius = r;
+    const innerRadius = Math.max(r - ringWidth, 0);
 
     const segments = [
       { color: '#EA4335', degrees: 105 },
@@ -2852,9 +2869,7 @@ export class ParticleEngine {
       const segColor = resolveSegmentColor(colorT);
       const a1 = t * Math.PI * 2;
       const a2 = nextT * Math.PI * 2;
-      g.beginPath();
-      g.arc(cx, cy, ringR, a1, a2);
-      g.stroke({ width: ringWidth, color: segColor, alpha: 1, cap: 'butt' });
+      drawCircularRingSegment(g, cx, cy, outerRadius, innerRadius, a1, a2, segColor);
     }
   }
 

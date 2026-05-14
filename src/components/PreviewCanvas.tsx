@@ -248,12 +248,17 @@ const PreviewCanvas: React.FC<Props> = ({ image, gifData, effect, shape, mirror,
     if (!canvas?.current) return;
     const target = canvas.current as HTMLCanvasElement & {
       __avatarSetExportFrameStep?: (deltaMs: number | null) => void;
+      __avatarSetRingLoopProgress?: (progress: number | null) => void;
       __avatarRenderFrame?: () => void;
     };
 
     target.__avatarSetExportFrameStep = (deltaMs: number | null) => {
       fixedDeltaMsRef.current = deltaMs;
       engineRef.current.setFixedDeltaMs(deltaMs);
+    };
+
+    target.__avatarSetRingLoopProgress = (progress: number | null) => {
+      engineRef.current.setRingLoopProgress(progress);
     };
 
     target.__avatarRenderFrame = () => {
@@ -273,6 +278,7 @@ const PreviewCanvas: React.FC<Props> = ({ image, gifData, effect, shape, mirror,
 
     return () => {
       delete target.__avatarSetExportFrameStep;
+      delete target.__avatarSetRingLoopProgress;
       delete target.__avatarRenderFrame;
     };
   }, [canvasRef, effect]);
