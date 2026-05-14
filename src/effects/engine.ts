@@ -140,6 +140,7 @@ export class ParticleEngine {
   private googleOnePhase = 0;
   private frameDeltaSeconds = 1 / 60;
   private lastUpdateAt = 0;
+  private fixedDeltaSeconds: number | null = null;
 
   setEffect(e: EffectType) { this.effect = e; this.particles = []; this.lightningBolts = []; }
   setShape(s: CropShape) {
@@ -150,20 +151,26 @@ export class ParticleEngine {
   setParams(p: EffectParams) { this.params = p; }
   setFixedDeltaMs(deltaMs: number | null) {
     if (deltaMs == null) {
+      this.fixedDeltaSeconds = null;
       this.lastUpdateAt = 0;
       this.frameDeltaSeconds = 1 / 60;
       return;
     }
-    this.frameDeltaSeconds = Math.max(deltaMs, 0) / 1000;
+    this.fixedDeltaSeconds = Math.max(deltaMs, 0) / 1000;
+    this.frameDeltaSeconds = this.fixedDeltaSeconds;
     this.lastUpdateAt = 0;
   }
 
   update(canvasW: number, canvasH: number, imgSize: number) {
-    const now = performance.now();
-    this.frameDeltaSeconds = this.lastUpdateAt
-      ? Math.min((now - this.lastUpdateAt) / 1000, 0.1)
-      : 1 / 60;
-    this.lastUpdateAt = now;
+    if (this.fixedDeltaSeconds != null) {
+      this.frameDeltaSeconds = this.fixedDeltaSeconds;
+    } else {
+      const now = performance.now();
+      this.frameDeltaSeconds = this.lastUpdateAt
+        ? Math.min((now - this.lastUpdateAt) / 1000, 0.1)
+        : 1 / 60;
+      this.lastUpdateAt = now;
+    }
 
     const dt = (this.params.speed / 50) * 0.8;
     this.time += dt * 0.016;
@@ -2885,5 +2892,6 @@ export class ParticleEngine {
     this.googleOnePhase = 0;
     this.frameDeltaSeconds = 1 / 60;
     this.lastUpdateAt = 0;
+    this.fixedDeltaSeconds = null;
   }
 }
