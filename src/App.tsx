@@ -24,11 +24,13 @@ import './App.css';
 const supportsMediaRecorder = typeof MediaRecorder !== 'undefined';
 const supportsWebWorkers = typeof Worker !== 'undefined';
 const GIF_TRANSPARENT_KEY = 0xff00ff;
-const RING_EFFECTS = new Set<EffectType>(['solidring', 'disc', 'googleone']);
+const RING_EFFECTS = new Set<EffectType>(['solidring', 'disc', 'googleone', 'duotone', 'blinkring']);
 const EFFECT_LABELS: Record<EffectType, string> = {
   solidring: '实心环',
   disc: '光盘',
   googleone: 'Google One 环',
+  duotone: '双色环',
+  blinkring: '闪烁环',
   lightning: '闪电',
   fire: '火焰',
   glow: '炫光',
@@ -531,7 +533,7 @@ function App() {
         <h1>动态头像工作台</h1>
         <p className="subtitle">上传图片或 GIF，套用动态特效，导出支持透明背景的头像动画。</p>
         <div className="header-badges">
-          <span className="meta-pill">23 种特效</span>
+          <span className="meta-pill">26 种特效</span>
           <span className="meta-pill">圆外透明导出</span>
           <span className="meta-pill">GIF / APNG / WebP / WebM</span>
         </div>

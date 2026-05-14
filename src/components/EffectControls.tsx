@@ -7,7 +7,7 @@ interface Props {
   onChange: (p: EffectParams) => void;
 }
 
-const RING_EFFECTS = new Set<EffectType>(['solidring', 'disc', 'googleone']);
+const DIRECTION_EFFECTS = new Set<EffectType>(['solidring', 'disc', 'googleone', 'duotone']);
 
 const EffectControls: React.FC<Props> = ({ effect, params, onChange }) => {
   const set = (key: keyof EffectParams, val: number | string) => {
@@ -52,7 +52,7 @@ const EffectControls: React.FC<Props> = ({ effect, params, onChange }) => {
           onChange={(e) => set('secondaryColor', e.target.value)}
         />
       </div>
-      {RING_EFFECTS.has(effect) && (
+      {DIRECTION_EFFECTS.has(effect) && (
         <div className="control-row direction-row">
           <label>旋转方向</label>
           <div className="direction-toggle">

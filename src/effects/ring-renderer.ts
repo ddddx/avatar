@@ -6,7 +6,7 @@ import {
 import type { CropShape, EffectParams, EffectType, MirrorSettings } from './types';
 import type { GifData } from '../lib/gif-decoder';
 
-const RING_EFFECTS = new Set<EffectType>(['solidring', 'disc', 'googleone']);
+const RING_EFFECTS = new Set<EffectType>(['solidring', 'disc', 'googleone', 'duotone', 'blinkring']);
 const SOLID_RING_COLORS = ['#ff0040', '#ff8000', '#00ff80', '#00b0ff', '#ff0040'];
 const DISC_COLORS = ['#ff0040', '#ff8000', '#ffe000', '#00ff80', '#00b0ff', '#a040ff', '#ff0040'];
 const GOOGLE_ONE_SEGMENTS = [
@@ -123,13 +123,23 @@ function addSampledPaletteStops(gradient: CanvasGradient, colors: readonly strin
   }
 }
 
-function createRingGradient(
+function getDuotoneSegmentCount(density: number) {
+  const pairCount = Math.max(1, Math.round(1 + (density / 100) * 23));
+  return pairCount * 2;
+}
+
+function createRingPaint(
   ctx: CanvasRenderingContext2D,
   effect: EffectType,
+  params: EffectParams,
   phase: number,
   width: number,
   height: number,
-) {
+) : string | CanvasGradient {
+  if (effect === 'blinkring') {
+    return phase < 0.5 ? params.color : params.secondaryColor;
+  }
+
   const gradient = ctx.createConicGradient(phase * Math.PI * 2, width / 2, height / 2);
 
   if (effect === 'solidring') {
@@ -139,6 +149,20 @@ function createRingGradient(
 
   if (effect === 'disc') {
     addSampledPaletteStops(gradient, DISC_COLORS);
+    return gradient;
+  }
+
+  if (effect === 'duotone') {
+    const segmentCount = getDuotoneSegmentCount(params.density);
+    for (let i = 0; i < segmentCount; i++) {
+      const start = i / segmentCount;
+      const end = (i + 1) / segmentCount;
+      const color = i % 2 === 0 ? params.color : params.secondaryColor;
+      gradient.addColorStop(start, color);
+      gradient.addColorStop(end, color);
+    }
+    gradient.addColorStop(0, params.color);
+    gradient.addColorStop(1, params.secondaryColor);
     return gradient;
   }
 
@@ -247,11 +271,13 @@ export function createRingRenderer({
         ? 4 + (params.intensity / 100) * 36
         : effect === 'disc'
           ? 15 + (params.intensity / 100) * 35
-          : 28 + (params.intensity / 100) * 24;
+          : effect === 'duotone' || effect === 'blinkring'
+            ? 10 + (params.intensity / 100) * 34
+            : 28 + (params.intensity / 100) * 24;
 
-      const gradient = createRingGradient(ctx, effect, phase, width, height);
+      const paint = createRingPaint(ctx, effect, params, phase, width, height);
       appendRingPath(ctx, shape, width, height, ringWidth);
-      ctx.fillStyle = gradient;
+      ctx.fillStyle = paint;
       ctx.fill(shape === 'square' ? 'evenodd' : undefined);
     },
   };

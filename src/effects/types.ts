@@ -1,6 +1,6 @@
 import type { Application, Container, Graphics } from 'pixi.js';
 
-export type EffectType = 'lightning' | 'fire' | 'glow' | 'orbit' | 'shield' | 'frost' | 'ripple' | 'petal' | 'stardust' | 'prism' | 'vortex' | 'firework' | 'gold' | 'spin' | 'loader' | 'spinner' | 'matrix' | 'bubble' | 'aurora' | 'firefly' | 'rain' | 'solidring' | 'disc' | 'googleone';
+export type EffectType = 'lightning' | 'fire' | 'glow' | 'orbit' | 'shield' | 'frost' | 'ripple' | 'petal' | 'stardust' | 'prism' | 'vortex' | 'firework' | 'gold' | 'spin' | 'loader' | 'spinner' | 'matrix' | 'bubble' | 'aurora' | 'firefly' | 'rain' | 'solidring' | 'disc' | 'googleone' | 'duotone' | 'blinkring';
 export type CropShape = 'circle' | 'square';
 export type RotationDirection = 'forward' | 'reverse';
 export const SQUARE_CORNER_RADIUS = 16;
@@ -122,4 +122,6 @@ export const EFFECT_PRESETS: Record<EffectType, Partial<EffectParams>> = {
   solidring: { color: '#00d4ff', secondaryColor: '#ff6b35', density: 50, intensity: 60, speed: 50, direction: 'forward' },
   disc:      { color: '#00b0ff', secondaryColor: '#ff0040', density: 60, intensity: 55, speed: 50, direction: 'forward' },
   googleone: { color: '#ea4335', secondaryColor: '#34a853', density: 50, intensity: 60, speed: 50, direction: 'forward' },
+  duotone:   { color: '#00d4ff', secondaryColor: '#ff6b35', density: 50, intensity: 58, speed: 50, direction: 'forward' },
+  blinkring: { color: '#00d4ff', secondaryColor: '#ff6b35', density: 50, intensity: 58, speed: 50, direction: 'forward' },
 };

@@ -22,6 +22,7 @@ const NON_GLOW_EFFECTS = new Set<EffectType>(['solidring', 'disc', 'googleone', 
 const PreviewCanvas: React.FC<Props> = ({ image, gifData, effect, shape, mirror, params, canvasRef }) => {
   const isRingEffect = isRingEffectType(effect);
   const noImageMode = !image && !gifData;
+  const paramsRef = useRef(params);
   const containerRef = useRef<HTMLDivElement>(null);
   const appRef = useRef<PIXI.Application | null>(null);
   const engineRef = useRef(new ParticleEngine());
@@ -43,6 +44,8 @@ const PreviewCanvas: React.FC<Props> = ({ image, gifData, effect, shape, mirror,
   const ringCtxRef = useRef<CanvasRenderingContext2D | null>(null);
   const ringRendererRef = useRef<ReturnType<typeof createRingRenderer> | null>(null);
   const ringElapsedMsRef = useRef(0);
+
+  paramsRef.current = params;
 
   // Single init + animation effect
   useEffect(() => {
@@ -95,11 +98,12 @@ const PreviewCanvas: React.FC<Props> = ({ image, gifData, effect, shape, mirror,
         const deltaMs = fixedDeltaMsRef.current ?? (gifLastTimeRef.current ? Math.min(now - gifLastTimeRef.current, 100) : 16.67);
         gifLastTimeRef.current = now;
         ringElapsedMsRef.current += deltaMs;
-        const progress = getRingAnimationProgress(params.speed, ringElapsedMsRef.current);
+        const currentParams = paramsRef.current;
+        const progress = getRingAnimationProgress(currentParams.speed, ringElapsedMsRef.current);
         const ctx = ringCtxRef.current;
         const renderer = ringRendererRef.current;
         if (ctx && renderer) {
-          renderer.render(ctx, params, progress, ringElapsedMsRef.current);
+          renderer.render(ctx, currentParams, progress, ringElapsedMsRef.current);
         }
         rafRef.current = requestAnimationFrame(tick);
       };
@@ -324,10 +328,17 @@ const PreviewCanvas: React.FC<Props> = ({ image, gifData, effect, shape, mirror,
   // Live-update params (speed, density, intensity, colors) without restarting animation
   useEffect(() => {
     if (isRingEffect) {
+      const ctx = ringCtxRef.current;
+      const renderer = ringRendererRef.current;
+      if (ctx && renderer) {
+        const currentParams = paramsRef.current;
+        const progress = getRingAnimationProgress(currentParams.speed, ringElapsedMsRef.current);
+        renderer.render(ctx, currentParams, progress, ringElapsedMsRef.current);
+      }
       return;
     }
     engineRef.current.setParams(params);
-  }, [params]);
+  }, [isRingEffect, params]);
 
   useEffect(() => {
     const canvas = canvasRef as React.MutableRefObject<HTMLCanvasElement | null> | null;
@@ -369,8 +380,9 @@ const PreviewCanvas: React.FC<Props> = ({ image, gifData, effect, shape, mirror,
         const ctx = ringCtxRef.current;
         const renderer = ringRendererRef.current;
         if (!ctx || !renderer) return;
-        const progress = getRingAnimationProgress(params.speed, ringElapsedMsRef.current);
-        renderer.render(ctx, params, progress, ringElapsedMsRef.current);
+        const currentParams = paramsRef.current;
+        const progress = getRingAnimationProgress(currentParams.speed, ringElapsedMsRef.current);
+        renderer.render(ctx, currentParams, progress, ringElapsedMsRef.current);
         return;
       }
 
