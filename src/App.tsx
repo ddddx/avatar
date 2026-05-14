@@ -11,8 +11,8 @@ import {
   RING_LOOP_FRAME_DELAY_MS,
 } from './effects/types';
 import type { EffectType, CropShape, EffectParams, MirrorSettings } from './effects/types';
-// @ts-ignore - gif.js has no types
-import GIF from './lib/gif.js';
+import { createRingRenderer } from './effects/ring-renderer';
+import './lib/gif.js';
 // @ts-ignore - upng-js has no types
 import * as UPNG from 'upng-js';
 // @ts-ignore - wasm-webp has no types
@@ -24,6 +24,7 @@ const supportsMediaRecorder = typeof MediaRecorder !== 'undefined';
 const supportsWebWorkers = typeof Worker !== 'undefined';
 const GIF_TRANSPARENT_KEY = 0xff00ff;
 const RING_EFFECTS = new Set<EffectType>(['solidring', 'disc', 'googleone']);
+const GIF = (window as unknown as { GIF: any }).GIF;
 const EFFECT_LABELS: Record<EffectType, string> = {
   solidring: '实心环',
   disc: '光盘',
@@ -63,11 +64,59 @@ function applyCircleAlphaMask(ctx: CanvasRenderingContext2D, w: number, h: numbe
 function snapTransparentToGifKey(imageData: ImageData) {
   const px = imageData.data;
   for (let i = 0; i < px.length; i += 4) {
-    if (px[i + 3] < 8) {
+    if (px[i + 3] < 64) {
       px[i] = 255;
       px[i + 1] = 0;
       px[i + 2] = 255;
-      px[i + 3] = 255;
+    }
+    px[i + 3] = 255;
+  }
+}
+
+
+type OfflineRingRendererOptions = {
+  width: number;
+  height: number;
+  image: HTMLImageElement | null;
+  gifData: GifData | null;
+  effect: EffectType;
+  shape: CropShape;
+  mirror: MirrorSettings;
+  params: EffectParams;
+};
+
+function createOfflineRingRenderer({
+  width,
+  height,
+  image,
+  gifData,
+  effect,
+  shape,
+  mirror,
+  params,
+}: OfflineRingRendererOptions) {
+  const frameCanvas = document.createElement('canvas');
+  frameCanvas.width = width;
+  frameCanvas.height = height;
+  const ctx = frameCanvas.getContext('2d', { willReadFrequently: true });
+  if (!ctx) {
+    throw new Error('无法创建导出画布');
+  }
+  const renderer = createRingRenderer({
+    width,
+    height,
+    image,
+    gifData,
+    effect,
+    shape,
+    mirror,
+  });
+
+  return {
+    frameCanvas,
+    renderFrame(progress: number, elapsedMs: number) {
+      renderer.render(ctx, params, progress, elapsedMs);
+      return frameCanvas;
     }
   }
 }
@@ -76,6 +125,7 @@ type ExportDrivenCanvas = HTMLCanvasElement & {
   __avatarSetExportFrameStep?: (deltaMs: number | null) => void;
   __avatarSetRingLoopProgress?: (progress: number | null) => void;
   __avatarRenderFrame?: () => void;
+  __avatarExtractFrame?: () => HTMLCanvasElement | null;
 };
 
 function App() {
@@ -201,6 +251,18 @@ function App() {
     const frameDelay = Math.round(1000 / fps);
     const captureDelay = RING_EFFECTS.has(effect) ? RING_LOOP_FRAME_DELAY_MS : frameDelay;
     const exportCanvas = canvas as ExportDrivenCanvas;
+    const ringRenderer = RING_EFFECTS.has(effect)
+      ? createOfflineRingRenderer({
+          width: canvas.width,
+          height: canvas.height,
+          image,
+          gifData,
+          effect,
+          shape,
+          mirror,
+          params,
+        })
+      : null;
 
     // For no-image mode: composite WebGL canvas over BLACK (not magenta!)
     // so semi-transparent edges blend to dark colors, not pink.
@@ -216,16 +278,20 @@ function App() {
     const BG_THRESHOLD = 8; // pixels dimmer than this are "background" → transparent
 
     try {
-      if (RING_EFFECTS.has(effect)) {
+      if (RING_EFFECTS.has(effect) && !ringRenderer) {
         exportCanvas.__avatarSetExportFrameStep?.(captureDelay);
       }
 
       // Capture frames
       for (let i = 0; i < frameCount; i++) {
-        if (RING_EFFECTS.has(effect)) {
+        if (RING_EFFECTS.has(effect) && !ringRenderer) {
           exportCanvas.__avatarSetRingLoopProgress?.(i / frameCount);
           exportCanvas.__avatarRenderFrame?.();
         }
+
+        const sourceCanvas = RING_EFFECTS.has(effect)
+          ? (ringRenderer?.renderFrame(i / frameCount, i * captureDelay) ?? exportCanvas.__avatarExtractFrame?.() ?? canvas)
+          : canvas;
 
         if (offscreen && offCtx) {
           offCtx.clearRect(0, 0, offscreen.width, offscreen.height);
@@ -233,7 +299,7 @@ function App() {
             offCtx.fillStyle = '#000000';
             offCtx.fillRect(0, 0, offscreen.width, offscreen.height);
           }
-          offCtx.drawImage(canvas, 0, 0);
+          offCtx.drawImage(sourceCanvas, 0, 0);
           if (shape === 'circle') {
             applyCircleAlphaMask(offCtx, offscreen.width, offscreen.height);
           }
@@ -252,7 +318,7 @@ function App() {
           offCtx.putImageData(imgData, 0, 0);
           gif.addFrame(offscreen, { copy: true, delay: captureDelay });
         } else {
-          gif.addFrame(canvas, { copy: true, delay: captureDelay });
+          gif.addFrame(sourceCanvas, { copy: true, delay: captureDelay });
         }
         setExportProgress((i + 1) / frameCount * 0.5);
         if (!RING_EFFECTS.has(effect)) {
@@ -283,7 +349,7 @@ function App() {
 
       gif.render();
     });
-  }, [effect, downloadBlob, image, gifData, shape]);
+  }, [effect, downloadBlob, gifData, image, mirror, params, shape]);
 
   // Export as PNG sequence frames (most compatible)
   // Export as APNG (animated PNG with full alpha support)
@@ -295,6 +361,18 @@ function App() {
     const w = canvas.width;
     const h = canvas.height;
     const exportCanvas = canvas as ExportDrivenCanvas;
+    const ringRenderer = RING_EFFECTS.has(effect)
+      ? createOfflineRingRenderer({
+          width: w,
+          height: h,
+          image,
+          gifData,
+          effect,
+          shape,
+          mirror,
+          params,
+        })
+      : null;
 
     const frames: ArrayBuffer[] = [];
     const delays: number[] = [];
@@ -306,18 +384,22 @@ function App() {
     const offCtx = offscreen.getContext('2d')!;
 
     try {
-      if (RING_EFFECTS.has(effect)) {
+      if (RING_EFFECTS.has(effect) && !ringRenderer) {
         exportCanvas.__avatarSetExportFrameStep?.(frameDelay);
       }
 
       for (let i = 0; i < frameCount; i++) {
-        if (RING_EFFECTS.has(effect)) {
+        if (RING_EFFECTS.has(effect) && !ringRenderer) {
           exportCanvas.__avatarSetRingLoopProgress?.(i / frameCount);
           exportCanvas.__avatarRenderFrame?.();
         }
 
+        const sourceCanvas = RING_EFFECTS.has(effect)
+          ? (ringRenderer?.renderFrame(i / frameCount, i * frameDelay) ?? exportCanvas.__avatarExtractFrame?.() ?? canvas)
+          : canvas;
+
         offCtx.clearRect(0, 0, w, h);
-        offCtx.drawImage(canvas, 0, 0);
+        offCtx.drawImage(sourceCanvas, 0, 0);
         if (shape === 'circle') {
           applyCircleAlphaMask(offCtx, w, h);
         }
@@ -341,7 +423,7 @@ function App() {
     const blob = new Blob([apng], { type: 'image/apng' });
     setExportProgress(1);
     downloadBlob(blob, `avatar-${effect}.apng`);
-  }, [effect, downloadBlob, image, gifData, shape]);
+  }, [effect, downloadBlob, gifData, image, mirror, params, shape]);
 
   // Export as animated WebP (single .webp file) using wasm-webp
   const exportWebP = useCallback(async (canvas: HTMLCanvasElement) => {
@@ -352,6 +434,18 @@ function App() {
     const w = canvas.width;
     const h = canvas.height;
     const exportCanvas = canvas as ExportDrivenCanvas;
+    const ringRenderer = RING_EFFECTS.has(effect)
+      ? createOfflineRingRenderer({
+          width: w,
+          height: h,
+          image,
+          gifData,
+          effect,
+          shape,
+          mirror,
+          params,
+        })
+      : null;
     // PIXI uses WebGL — can't getContext('2d') directly, use offscreen canvas
     const offscreen = document.createElement('canvas');
     offscreen.width = w;
@@ -360,18 +454,22 @@ function App() {
 
     const frames: { data: Uint8Array; duration: number }[] = [];
     try {
-      if (RING_EFFECTS.has(effect)) {
+      if (RING_EFFECTS.has(effect) && !ringRenderer) {
         exportCanvas.__avatarSetExportFrameStep?.(frameDelay);
       }
 
       for (let i = 0; i < frameCount; i++) {
-        if (RING_EFFECTS.has(effect)) {
+        if (RING_EFFECTS.has(effect) && !ringRenderer) {
           exportCanvas.__avatarSetRingLoopProgress?.(i / frameCount);
           exportCanvas.__avatarRenderFrame?.();
         }
 
+        const sourceCanvas = RING_EFFECTS.has(effect)
+          ? (ringRenderer?.renderFrame(i / frameCount, i * frameDelay) ?? exportCanvas.__avatarExtractFrame?.() ?? canvas)
+          : canvas;
+
         ctx.clearRect(0, 0, w, h);
-        ctx.drawImage(canvas, 0, 0);
+        ctx.drawImage(sourceCanvas, 0, 0);
         if (shape === 'circle') {
           applyCircleAlphaMask(ctx, w, h);
         }
@@ -393,7 +491,7 @@ function App() {
     setExportProgress(1);
     const blob = new Blob([webpData.buffer as ArrayBuffer], { type: 'image/webp' });
     downloadBlob(blob, `avatar-${effect}.webp`);
-  }, [effect, downloadBlob, shape]);
+  }, [effect, downloadBlob, gifData, image, mirror, params, shape]);
 
   const handleExport = useCallback(async () => {
     const canvas = canvasRef.current;

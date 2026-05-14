@@ -2,6 +2,7 @@ import React, { useRef, useEffect } from 'react';
 import * as PIXI from 'pixi.js';
 import { ParticleEngine } from '../effects/engine';
 import { SQUARE_CORNER_RADIUS } from '../effects/types';
+import { createRingRenderer, getRingAnimationProgress, isRingEffect as isRingEffectType } from '../effects/ring-renderer';
 import type { EffectType, CropShape, EffectParams, MirrorSettings } from '../effects/types';
 import type { GifData } from '../lib/gif-decoder';
 
@@ -18,6 +19,7 @@ interface Props {
 const SIZE = 512;
 
 const PreviewCanvas: React.FC<Props> = ({ image, gifData, effect, shape, mirror, params, canvasRef }) => {
+  const isRingEffect = isRingEffectType(effect);
   const noImageMode = !image && !gifData;
   const containerRef = useRef<HTMLDivElement>(null);
   const appRef = useRef<PIXI.Application | null>(null);
@@ -27,6 +29,7 @@ const PreviewCanvas: React.FC<Props> = ({ image, gifData, effect, shape, mirror,
   const effectsGfxRef = useRef<PIXI.Graphics | null>(null);
   const glowGfxRef = useRef<PIXI.Graphics | null>(null);
   const rafRef = useRef<number>(0);
+  const tickRef = useRef<(() => void) | null>(null);
   const initRef = useRef(false);
   // GIF animation state
   const gifTexturesRef = useRef<PIXI.Texture[]>([]);
@@ -34,10 +37,83 @@ const PreviewCanvas: React.FC<Props> = ({ image, gifData, effect, shape, mirror,
   const gifTimerRef = useRef(0);
   const gifLastTimeRef = useRef(0);
   const fixedDeltaMsRef = useRef<number | null>(null);
+  const exportActiveRef = useRef(false);
+  const ringCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const ringCtxRef = useRef<CanvasRenderingContext2D | null>(null);
+  const ringRendererRef = useRef<ReturnType<typeof createRingRenderer> | null>(null);
+  const ringElapsedMsRef = useRef(0);
 
   // Single init + animation effect
   useEffect(() => {
     let destroyed = false;
+
+    if (isRingEffect) {
+      cancelAnimationFrame(rafRef.current);
+      appRef.current?.destroy(true);
+      appRef.current = null;
+      initRef.current = false;
+      for (const tex of gifTexturesRef.current) {
+        tex.destroy(true);
+      }
+      gifTexturesRef.current = [];
+
+      const container = containerRef.current;
+      if (!container) return;
+
+      container.innerHTML = '';
+      const canvas = document.createElement('canvas');
+      canvas.width = SIZE;
+      canvas.height = SIZE;
+      canvas.style.width = '100%';
+      canvas.style.height = '100%';
+      canvas.style.display = 'block';
+      container.appendChild(canvas);
+      ringCanvasRef.current = canvas;
+      ringCtxRef.current = canvas.getContext('2d');
+      ringRendererRef.current = ringCtxRef.current
+        ? createRingRenderer({
+            width: SIZE,
+            height: SIZE,
+            image,
+            gifData,
+            effect,
+            shape,
+            mirror,
+          })
+        : null;
+      ringElapsedMsRef.current = 0;
+      gifLastTimeRef.current = 0;
+
+      if (canvasRef) {
+        (canvasRef as React.MutableRefObject<HTMLCanvasElement | null>).current = canvas;
+      }
+
+      const tick = () => {
+        if (destroyed) return;
+        const now = performance.now();
+        const deltaMs = fixedDeltaMsRef.current ?? (gifLastTimeRef.current ? Math.min(now - gifLastTimeRef.current, 100) : 16.67);
+        gifLastTimeRef.current = now;
+        ringElapsedMsRef.current += deltaMs;
+        const progress = getRingAnimationProgress(params.speed, ringElapsedMsRef.current);
+        const ctx = ringCtxRef.current;
+        const renderer = ringRendererRef.current;
+        if (ctx && renderer) {
+          renderer.render(ctx, params, progress, ringElapsedMsRef.current);
+        }
+        rafRef.current = requestAnimationFrame(tick);
+      };
+
+      tickRef.current = tick;
+      rafRef.current = requestAnimationFrame(tick);
+
+      return () => {
+        destroyed = true;
+        cancelAnimationFrame(rafRef.current);
+        ringCanvasRef.current = null;
+        ringCtxRef.current = null;
+        ringRendererRef.current = null;
+      };
+    }
 
     const setup = async () => {
       // Init PIXI app once
@@ -183,6 +259,19 @@ const PreviewCanvas: React.FC<Props> = ({ image, gifData, effect, shape, mirror,
       engine.setParams(params);
       engine.setFixedDeltaMs(fixedDeltaMsRef.current);
 
+      const renderCurrentFrame = () => {
+        if (!(exportActiveRef.current && isRingEffect)) {
+          engine.update(SIZE, SIZE, imgSize);
+        }
+
+        if (effect !== 'solidring' && effect !== 'disc' && effect !== 'googleone') {
+          engine.draw(glowGfx, SIZE, SIZE, imgSize);
+        } else {
+          glowGfx.clear();
+        }
+        engine.draw(effectsGfx, SIZE, SIZE, imgSize);
+      };
+
       // Animation loop — draw to both glow (blurred) and sharp layers
       const tick = () => {
         if (destroyed) return;
@@ -205,17 +294,10 @@ const PreviewCanvas: React.FC<Props> = ({ image, gifData, effect, shape, mirror,
           }
         }
 
-        engine.update(SIZE, SIZE, imgSize);
-        // For solidring/disc/googleone, skip glow layer and avoid additive blending
-        // so the ring colors stay opaque instead of brightening the image below.
-        if (effect !== 'solidring' && effect !== 'disc' && effect !== 'googleone') {
-          engine.draw(glowGfx, SIZE, SIZE, imgSize);   // blurred glow
-        } else {
-          glowGfx.clear();
-        }
-        engine.draw(effectsGfx, SIZE, SIZE, imgSize); // sharp cores
+        renderCurrentFrame();
         rafRef.current = requestAnimationFrame(tick);
       };
+      tickRef.current = tick;
       rafRef.current = requestAnimationFrame(tick);
     };
 
@@ -240,6 +322,9 @@ const PreviewCanvas: React.FC<Props> = ({ image, gifData, effect, shape, mirror,
 
   // Live-update params (speed, density, intensity, colors) without restarting animation
   useEffect(() => {
+    if (isRingEffect) {
+      return;
+    }
     engineRef.current.setParams(params);
   }, [params]);
 
@@ -250,23 +335,51 @@ const PreviewCanvas: React.FC<Props> = ({ image, gifData, effect, shape, mirror,
       __avatarSetExportFrameStep?: (deltaMs: number | null) => void;
       __avatarSetRingLoopProgress?: (progress: number | null) => void;
       __avatarRenderFrame?: () => void;
+      __avatarExtractFrame?: () => HTMLCanvasElement | null;
     };
 
     target.__avatarSetExportFrameStep = (deltaMs: number | null) => {
       fixedDeltaMsRef.current = deltaMs;
-      engineRef.current.setFixedDeltaMs(deltaMs);
+      exportActiveRef.current = deltaMs != null;
+      if (!isRingEffect) {
+        engineRef.current.setFixedDeltaMs(deltaMs);
+      }
+      if (isRingEffect) {
+        if (deltaMs != null) {
+          cancelAnimationFrame(rafRef.current);
+          rafRef.current = 0;
+        } else if (!rafRef.current && tickRef.current) {
+          rafRef.current = requestAnimationFrame(tickRef.current);
+        }
+      }
     };
 
     target.__avatarSetRingLoopProgress = (progress: number | null) => {
+      if (isRingEffect) {
+        if (progress == null) return;
+        ringElapsedMsRef.current = progress * 2000;
+        return;
+      }
       engineRef.current.setRingLoopProgress(progress);
     };
 
     target.__avatarRenderFrame = () => {
+      if (isRingEffect) {
+        const ctx = ringCtxRef.current;
+        const renderer = ringRendererRef.current;
+        if (!ctx || !renderer) return;
+        const progress = getRingAnimationProgress(params.speed, ringElapsedMsRef.current);
+        renderer.render(ctx, params, progress, ringElapsedMsRef.current);
+        return;
+      }
+
       const glowGfx = glowGfxRef.current;
       const effectsGfx = effectsGfxRef.current;
       if (!glowGfx || !effectsGfx) return;
 
-      engineRef.current.update(SIZE, SIZE, SIZE);
+      if (!exportActiveRef.current || !isRingEffect) {
+        engineRef.current.update(SIZE, SIZE, SIZE);
+      }
       if (effect !== 'solidring' && effect !== 'disc' && effect !== 'googleone') {
         engineRef.current.draw(glowGfx, SIZE, SIZE, SIZE);
       } else {
@@ -276,10 +389,28 @@ const PreviewCanvas: React.FC<Props> = ({ image, gifData, effect, shape, mirror,
       appRef.current?.render();
     };
 
+    target.__avatarExtractFrame = () => {
+      if (isRingEffect) {
+        return ringCanvasRef.current;
+      }
+      const app = appRef.current;
+      if (!app) return null;
+      const extracted = app.renderer.extract.pixels(app.stage);
+      const frameCanvas = document.createElement('canvas');
+      frameCanvas.width = extracted.width;
+      frameCanvas.height = extracted.height;
+      const ctx = frameCanvas.getContext('2d');
+      if (!ctx) return null;
+      const pixels = new Uint8ClampedArray(extracted.pixels);
+      ctx.putImageData(new ImageData(pixels, extracted.width, extracted.height), 0, 0);
+      return frameCanvas;
+    };
+
     return () => {
       delete target.__avatarSetExportFrameStep;
       delete target.__avatarSetRingLoopProgress;
       delete target.__avatarRenderFrame;
+      delete target.__avatarExtractFrame;
     };
   }, [canvasRef, effect]);
 
@@ -295,6 +426,11 @@ const PreviewCanvas: React.FC<Props> = ({ image, gifData, effect, shape, mirror,
         appRef.current.destroy(true);
         appRef.current = null;
       }
+      ringCanvasRef.current = null;
+      ringCtxRef.current = null;
+      ringRendererRef.current = null;
+      exportActiveRef.current = false;
+      tickRef.current = null;
     };
   }, []);
 

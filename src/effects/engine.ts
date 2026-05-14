@@ -62,6 +62,66 @@ function drawCircularRingSegment(
   drawRingQuad(g, p1Outer, p2Outer, p2Inner, p1Inner, color);
 }
 
+function drawRoundRectRingSegment(
+  g: PIXI.Graphics,
+  cx: number,
+  cy: number,
+  outerHalf: number,
+  outerRadius: number,
+  innerHalf: number,
+  innerRadius: number,
+  tStart: number,
+  tEnd: number,
+  color: number,
+) {
+  let from = ((tStart % 1) + 1) % 1;
+  let to = tEnd;
+  while (to < from) to += 1;
+
+  const steps = Math.max(24, Math.ceil((to - from) * 720));
+  const points: number[] = [];
+
+  for (let i = 0; i <= steps; i++) {
+    const t = from + ((to - from) * i) / steps;
+    const p = getRoundRectPointStatic(cx, cy, outerHalf, outerRadius, t);
+    points.push(p.x, p.y);
+  }
+  for (let i = steps; i >= 0; i--) {
+    const t = from + ((to - from) * i) / steps;
+    const p = getRoundRectPointStatic(cx, cy, innerHalf, innerRadius, t);
+    points.push(p.x, p.y);
+  }
+
+  g.poly(points, true).fill({ color, alpha: 1 });
+}
+
+function getRoundRectPointStatic(cx: number, cy: number, half: number, radius: number, t: number): { x: number; y: number } {
+  const r = Math.min(radius, half);
+  const edgeLen = half * 2 - r * 2;
+  const arcLen = (Math.PI / 2) * r;
+  const totalPerim = 4 * edgeLen + 4 * arcLen;
+  t = ((t % 1) + 1) % 1;
+  let d = t * totalPerim;
+
+  if (d < edgeLen) return { x: cx - half + r + d, y: cy - half };
+  d -= edgeLen;
+  if (d < arcLen) { const a = -Math.PI / 2 + d / r; return { x: cx + half - r + Math.cos(a) * r, y: cy - half + r + Math.sin(a) * r }; }
+  d -= arcLen;
+  if (d < edgeLen) return { x: cx + half, y: cy - half + r + d };
+  d -= edgeLen;
+  if (d < arcLen) { const a = d / r; return { x: cx + half - r + Math.cos(a) * r, y: cy + half - r + Math.sin(a) * r }; }
+  d -= arcLen;
+  if (d < edgeLen) return { x: cx + half - r - d, y: cy + half };
+  d -= edgeLen;
+  if (d < arcLen) { const a = Math.PI / 2 + d / r; return { x: cx - half + r + Math.cos(a) * r, y: cy + half - r + Math.sin(a) * r }; }
+  d -= arcLen;
+  if (d < edgeLen) return { x: cx - half, y: cy + half - r - d };
+  d -= edgeLen;
+  if (d < arcLen) { const a = Math.PI + d / r; return { x: cx - half + r + Math.cos(a) * r, y: cy - half + r + Math.sin(a) * r }; }
+
+  return { x: cx - half + r, y: cy - half };
+}
+
 function getSquareTrackCornerRadius(outerHalf: number, half: number) {
   const inset = outerHalf - half;
   if (inset <= 0) return SQUARE_CORNER_RADIUS + Math.abs(inset);
@@ -2818,29 +2878,7 @@ export class ParticleEngine {
       { color: '#FBBC05', degrees: 45 },
     ] as const;
 
-    const totalDegrees = 360;
-    const cumulative: Array<{ start: number; end: number; color: string }> = [];
-    let degreeCursor = 0;
-    for (const segment of segments) {
-      cumulative.push({
-        start: degreeCursor / totalDegrees,
-        end: (degreeCursor + segment.degrees) / totalDegrees,
-        color: segment.color,
-      });
-      degreeCursor += segment.degrees;
-    }
-
-    const resolveSegmentColor = (t: number) => {
-      const normalized = ((t % 1) + 1) % 1;
-      for (const segment of cumulative) {
-        if (normalized >= segment.start && normalized < segment.end) {
-          return hexToNum(segment.color);
-        }
-      }
-      return hexToNum(cumulative[cumulative.length - 1].color);
-    };
-
-    const steps = 1440;
+    let segmentStart = this.googleOnePhase;
 
     if (this.shape === 'square') {
       const outerHalf = Math.min(r, sz / 2);
@@ -2848,28 +2886,33 @@ export class ParticleEngine {
       const outerRadius = SQUARE_CORNER_RADIUS;
       const innerRadius = Math.max(SQUARE_CORNER_RADIUS - ringWidth, 0);
 
-      for (let i = 0; i < steps; i++) {
-        const t = i / steps;
-        const nextT = (i + 1) / steps;
-        const colorT = this.getWrappedPhase(t + this.googleOnePhase);
-        const segColor = resolveSegmentColor(colorT);
-        const p1Outer = this.getRoundRectPoint(cx, cy, outerHalf, outerRadius, t);
-        const p2Outer = this.getRoundRectPoint(cx, cy, outerHalf, outerRadius, nextT);
-        const p2Inner = this.getRoundRectPoint(cx, cy, innerHalf, innerRadius, nextT);
-        const p1Inner = this.getRoundRectPoint(cx, cy, innerHalf, innerRadius, t);
-        drawRingQuad(g, p1Outer, p2Outer, p2Inner, p1Inner, segColor);
+      for (const segment of segments) {
+        const span = segment.degrees / 360;
+        drawRoundRectRingSegment(
+          g,
+          cx,
+          cy,
+          outerHalf,
+          outerRadius,
+          innerHalf,
+          innerRadius,
+          segmentStart,
+          segmentStart + span,
+          hexToNum(segment.color),
+        );
+        segmentStart += span;
       }
       return;
     }
 
-    for (let i = 0; i < steps; i++) {
-      const t = i / steps;
-      const nextT = (i + 1) / steps;
-      const colorT = this.getWrappedPhase(t + this.googleOnePhase);
-      const segColor = resolveSegmentColor(colorT);
-      const a1 = t * Math.PI * 2;
-      const a2 = nextT * Math.PI * 2;
-      drawCircularRingSegment(g, cx, cy, outerRadius, innerRadius, a1, a2, segColor);
+    for (const segment of segments) {
+      const span = segment.degrees / 360;
+      const startAngle = segmentStart * Math.PI * 2;
+      const endAngle = (segmentStart + span) * Math.PI * 2;
+      g.arc(cx, cy, outerRadius, startAngle, endAngle);
+      g.arc(cx, cy, innerRadius, endAngle, startAngle, true);
+      g.fill({ color: hexToNum(segment.color), alpha: 1 });
+      segmentStart += span;
     }
   }
 
