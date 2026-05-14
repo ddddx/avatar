@@ -4,7 +4,12 @@ import ImageUploader from './components/ImageUploader';
 import EffectSelector from './components/EffectSelector';
 import EffectControls from './components/EffectControls';
 import PreviewCanvas from './components/PreviewCanvas';
-import { DEFAULT_PARAMS, EFFECT_PRESETS } from './effects/types';
+import {
+  DEFAULT_PARAMS,
+  EFFECT_PRESETS,
+  RING_LOOP_FRAME_COUNT,
+  RING_LOOP_FRAME_DELAY_MS,
+} from './effects/types';
 import type { EffectType, CropShape, EffectParams, MirrorSettings } from './effects/types';
 // @ts-ignore - gif.js has no types
 import GIF from './lib/gif.js';
@@ -18,6 +23,7 @@ import './App.css';
 const supportsMediaRecorder = typeof MediaRecorder !== 'undefined';
 const supportsWebWorkers = typeof Worker !== 'undefined';
 const GIF_TRANSPARENT_KEY = 0xff00ff;
+const RING_EFFECTS = new Set<EffectType>(['solidring', 'disc', 'googleone']);
 const EFFECT_LABELS: Record<EffectType, string> = {
   solidring: '实心环',
   disc: '光盘',
@@ -65,6 +71,11 @@ function snapTransparentToGifKey(imageData: ImageData) {
     }
   }
 }
+
+type ExportDrivenCanvas = HTMLCanvasElement & {
+  __avatarSetExportFrameStep?: (deltaMs: number | null) => void;
+  __avatarRenderFrame?: () => void;
+};
 
 function App() {
   const [image, setImage] = useState<HTMLImageElement | null>(null);
@@ -185,8 +196,10 @@ function App() {
       transparent: (!image && !gifData) || shape === 'circle' ? GIF_TRANSPARENT_KEY : undefined,
     });
 
-    const frameCount = Math.floor((duration / 1000) * fps);
+    const frameCount = RING_EFFECTS.has(effect) ? RING_LOOP_FRAME_COUNT : Math.floor((duration / 1000) * fps);
     const frameDelay = Math.round(1000 / fps);
+    const captureDelay = RING_EFFECTS.has(effect) ? RING_LOOP_FRAME_DELAY_MS : frameDelay;
+    const exportCanvas = canvas as ExportDrivenCanvas;
 
     // For no-image mode: composite WebGL canvas over BLACK (not magenta!)
     // so semi-transparent edges blend to dark colors, not pink.
@@ -201,37 +214,51 @@ function App() {
     }
     const BG_THRESHOLD = 8; // pixels dimmer than this are "background" → transparent
 
-    // Capture frames
-    for (let i = 0; i < frameCount; i++) {
-      if (offscreen && offCtx) {
-        offCtx.clearRect(0, 0, offscreen.width, offscreen.height);
-        if (!image && !gifData) {
-          offCtx.fillStyle = '#000000';
-          offCtx.fillRect(0, 0, offscreen.width, offscreen.height);
-        }
-        offCtx.drawImage(canvas, 0, 0);
-        if (shape === 'circle') {
-          applyCircleAlphaMask(offCtx, offscreen.width, offscreen.height);
-        }
-        const imgData = offCtx.getImageData(0, 0, offscreen.width, offscreen.height);
-        if (!image && !gifData) {
-          const px = imgData.data;
-          for (let j = 0; j < px.length; j += 4) {
-            if (Math.max(px[j], px[j + 1], px[j + 2]) < BG_THRESHOLD) {
-              px[j] = 255; px[j + 1] = 0; px[j + 2] = 255;
-            }
-            px[j + 3] = 255;
-          }
-        } else if (shape === 'circle') {
-          snapTransparentToGifKey(imgData);
-        }
-        offCtx.putImageData(imgData, 0, 0);
-        gif.addFrame(offscreen, { copy: true, delay: frameDelay });
-      } else {
-        gif.addFrame(canvas, { copy: true, delay: frameDelay });
+    try {
+      if (RING_EFFECTS.has(effect)) {
+        exportCanvas.__avatarSetExportFrameStep?.(captureDelay);
       }
-      setExportProgress((i + 1) / frameCount * 0.5);
-      await new Promise(r => setTimeout(r, frameDelay));
+
+      // Capture frames
+      for (let i = 0; i < frameCount; i++) {
+        if (RING_EFFECTS.has(effect)) {
+          exportCanvas.__avatarRenderFrame?.();
+        }
+
+        if (offscreen && offCtx) {
+          offCtx.clearRect(0, 0, offscreen.width, offscreen.height);
+          if (!image && !gifData) {
+            offCtx.fillStyle = '#000000';
+            offCtx.fillRect(0, 0, offscreen.width, offscreen.height);
+          }
+          offCtx.drawImage(canvas, 0, 0);
+          if (shape === 'circle') {
+            applyCircleAlphaMask(offCtx, offscreen.width, offscreen.height);
+          }
+          const imgData = offCtx.getImageData(0, 0, offscreen.width, offscreen.height);
+          if (!image && !gifData) {
+            const px = imgData.data;
+            for (let j = 0; j < px.length; j += 4) {
+              if (Math.max(px[j], px[j + 1], px[j + 2]) < BG_THRESHOLD) {
+                px[j] = 255; px[j + 1] = 0; px[j + 2] = 255;
+              }
+              px[j + 3] = 255;
+            }
+          } else if (shape === 'circle') {
+            snapTransparentToGifKey(imgData);
+          }
+          offCtx.putImageData(imgData, 0, 0);
+          gif.addFrame(offscreen, { copy: true, delay: captureDelay });
+        } else {
+          gif.addFrame(canvas, { copy: true, delay: captureDelay });
+        }
+        setExportProgress((i + 1) / frameCount * 0.5);
+        if (!RING_EFFECTS.has(effect)) {
+          await new Promise(r => setTimeout(r, frameDelay));
+        }
+      }
+    } finally {
+      exportCanvas.__avatarSetExportFrameStep?.(null);
     }
 
     // Render GIF
@@ -260,10 +287,11 @@ function App() {
   const exportAPNG = useCallback(async (canvas: HTMLCanvasElement) => {
     const duration = 2000;
     const fps = 15;
-    const frameCount = Math.floor((duration / 1000) * fps);
-    const frameDelay = Math.round(1000 / fps);
+    const frameCount = RING_EFFECTS.has(effect) ? RING_LOOP_FRAME_COUNT : Math.floor((duration / 1000) * fps);
+    const frameDelay = RING_EFFECTS.has(effect) ? RING_LOOP_FRAME_DELAY_MS : Math.round(1000 / fps);
     const w = canvas.width;
     const h = canvas.height;
+    const exportCanvas = canvas as ExportDrivenCanvas;
 
     const frames: ArrayBuffer[] = [];
     const delays: number[] = [];
@@ -274,24 +302,32 @@ function App() {
     offscreen.height = h;
     const offCtx = offscreen.getContext('2d')!;
 
-    for (let i = 0; i < frameCount; i++) {
-      offCtx.clearRect(0, 0, w, h);
-      if (!image && !gifData) {
-        // Transparent background — just draw the WebGL canvas directly
-        offCtx.drawImage(canvas, 0, 0);
-      } else {
-        offCtx.drawImage(canvas, 0, 0);
+    try {
+      if (RING_EFFECTS.has(effect)) {
+        exportCanvas.__avatarSetExportFrameStep?.(frameDelay);
       }
-      if (shape === 'circle') {
-        applyCircleAlphaMask(offCtx, w, h);
-      }
-      const imgData = offCtx.getImageData(0, 0, w, h);
-      // Copy the pixel data buffer (UPNG needs ArrayBuffer)
-      frames.push(imgData.data.buffer.slice(0));
-      delays.push(frameDelay);
 
-      setExportProgress((i + 1) / frameCount * 0.8);
-      await new Promise(r => setTimeout(r, frameDelay));
+      for (let i = 0; i < frameCount; i++) {
+        if (RING_EFFECTS.has(effect)) {
+          exportCanvas.__avatarRenderFrame?.();
+        }
+
+        offCtx.clearRect(0, 0, w, h);
+        offCtx.drawImage(canvas, 0, 0);
+        if (shape === 'circle') {
+          applyCircleAlphaMask(offCtx, w, h);
+        }
+        const imgData = offCtx.getImageData(0, 0, w, h);
+        frames.push(imgData.data.buffer.slice(0));
+        delays.push(frameDelay);
+
+        setExportProgress((i + 1) / frameCount * 0.8);
+        if (!RING_EFFECTS.has(effect)) {
+          await new Promise(r => setTimeout(r, frameDelay));
+        }
+      }
+    } finally {
+      exportCanvas.__avatarSetExportFrameStep?.(null);
     }
 
     // Encode APNG — cnum=0 means auto colors
@@ -306,10 +342,11 @@ function App() {
   const exportWebP = useCallback(async (canvas: HTMLCanvasElement) => {
     const duration = 2000;
     const fps = 12;
-    const frameCount = Math.floor((duration / 1000) * fps);
-    const frameDelay = Math.round(1000 / fps);
+    const frameCount = RING_EFFECTS.has(effect) ? RING_LOOP_FRAME_COUNT : Math.floor((duration / 1000) * fps);
+    const frameDelay = RING_EFFECTS.has(effect) ? RING_LOOP_FRAME_DELAY_MS : Math.round(1000 / fps);
     const w = canvas.width;
     const h = canvas.height;
+    const exportCanvas = canvas as ExportDrivenCanvas;
     // PIXI uses WebGL — can't getContext('2d') directly, use offscreen canvas
     const offscreen = document.createElement('canvas');
     offscreen.width = w;
@@ -317,16 +354,30 @@ function App() {
     const ctx = offscreen.getContext('2d')!;
 
     const frames: { data: Uint8Array; duration: number }[] = [];
-    for (let i = 0; i < frameCount; i++) {
-      ctx.clearRect(0, 0, w, h);
-      ctx.drawImage(canvas, 0, 0);
-      if (shape === 'circle') {
-        applyCircleAlphaMask(ctx, w, h);
+    try {
+      if (RING_EFFECTS.has(effect)) {
+        exportCanvas.__avatarSetExportFrameStep?.(frameDelay);
       }
-      const imgData = ctx.getImageData(0, 0, w, h);
-      frames.push({ data: new Uint8Array(imgData.data), duration: frameDelay });
-      setExportProgress((i + 1) / frameCount * 0.7);
-      await new Promise(r => setTimeout(r, frameDelay));
+
+      for (let i = 0; i < frameCount; i++) {
+        if (RING_EFFECTS.has(effect)) {
+          exportCanvas.__avatarRenderFrame?.();
+        }
+
+        ctx.clearRect(0, 0, w, h);
+        ctx.drawImage(canvas, 0, 0);
+        if (shape === 'circle') {
+          applyCircleAlphaMask(ctx, w, h);
+        }
+        const imgData = ctx.getImageData(0, 0, w, h);
+        frames.push({ data: new Uint8Array(imgData.data), duration: frameDelay });
+        setExportProgress((i + 1) / frameCount * 0.7);
+        if (!RING_EFFECTS.has(effect)) {
+          await new Promise(r => setTimeout(r, frameDelay));
+        }
+      }
+    } finally {
+      exportCanvas.__avatarSetExportFrameStep?.(null);
     }
 
     setExportProgress(0.8);
@@ -443,7 +494,7 @@ function App() {
                   </div>
                   <p className="section-note">调粒子密度、强度、速度和主副色，找到最适合头像的节奏。</p>
                 </div>
-                <EffectControls params={params} onChange={setParams} />
+                <EffectControls effect={effect} params={params} onChange={setParams} />
               </section>
 
               <section className="panel output-panel">

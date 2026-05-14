@@ -1,5 +1,9 @@
 import * as PIXI from 'pixi.js';
-import { SQUARE_CORNER_RADIUS } from './types';
+import {
+  RING_LOOP_DURATION_MS,
+  RING_LOOP_SPEED_BASELINE,
+  SQUARE_CORNER_RADIUS,
+} from './types';
 import type { Particle, EffectParams, EffectType, CropShape } from './types';
 
 // ─── Color utilities ───
@@ -47,11 +51,6 @@ function getSquareTrackCornerRadius(outerHalf: number, half: number) {
   return Math.max(Math.min(SQUARE_CORNER_RADIUS - inset, half), 0);
 }
 
-const GIF_LOOP_FRAME_COUNT = 30;
-const GIF_LOOP_FRAME_DELAY_MS = 67;
-const GIF_LOOP_SECONDS = (GIF_LOOP_FRAME_COUNT * GIF_LOOP_FRAME_DELAY_MS) / 1000;
-const LOOP_SPEED_BASELINE = 50;
-
 export class ParticleEngine {
   particles: Particle[] = [];
   private time = 0;
@@ -59,7 +58,7 @@ export class ParticleEngine {
   private shape: CropShape = 'circle';
   private params: EffectParams = {
     density: 50, intensity: 50, speed: 50,
-    color: '#00d4ff', secondaryColor: '#ff6b35',
+    color: '#00d4ff', secondaryColor: '#ff6b35', direction: 'forward',
   };
 
   // Lightning state
@@ -132,13 +131,13 @@ export class ParticleEngine {
   private rainTime = 0;
 
   // SolidRing state
-  private solidRingAngle = 0;
+  private solidRingPhase = 0;
 
   // Disc state
-  private discAngle = 0;
+  private discPhase = 0;
 
   // Google One ring state
-  private googleOneAngle = -Math.PI / 2;
+  private googleOnePhase = 0;
   private frameDeltaSeconds = 1 / 60;
   private lastUpdateAt = 0;
 
@@ -149,6 +148,15 @@ export class ParticleEngine {
     this.clear();
   }
   setParams(p: EffectParams) { this.params = p; }
+  setFixedDeltaMs(deltaMs: number | null) {
+    if (deltaMs == null) {
+      this.lastUpdateAt = 0;
+      this.frameDeltaSeconds = 1 / 60;
+      return;
+    }
+    this.frameDeltaSeconds = Math.max(deltaMs, 0) / 1000;
+    this.lastUpdateAt = 0;
+  }
 
   update(canvasW: number, canvasH: number, imgSize: number) {
     const now = performance.now();
@@ -2623,7 +2631,7 @@ export class ParticleEngine {
   // ════════════════════════════════════════════════════════════════════
 
   private updateSolidRing(_cw: number, _ch: number, _sz: number) {
-    this.solidRingAngle = this.advanceLoopAngle(this.solidRingAngle);
+    this.solidRingPhase = this.advanceLoopPhase(this.solidRingPhase);
   }
 
   private drawSolidRing(g: PIXI.Graphics, cw: number, ch: number, sz: number) {
@@ -2631,8 +2639,6 @@ export class ParticleEngine {
     const r = sz / 2;
     const lineWidth = 4 + (this.params.intensity / 100) * 36;
     const steps = 1920;
-    const time = this.solidRingAngle;
-
     // Vivid gradient: red → orange → green → blue
     const rainbowColors = [
       '#ff0040',
@@ -2651,7 +2657,7 @@ export class ParticleEngine {
       const innerRadius = Math.max(SQUARE_CORNER_RADIUS - lineWidth, 0);
       for (let i = 0; i < steps; i++) {
         const t = i / steps;
-        const colorT = (t + time * 0.3) % 1;
+        const colorT = this.getWrappedPhase(t + this.solidRingPhase);
         const colorIdx = colorT * (rainbowColors.length - 1);
         const ci = Math.floor(colorIdx);
         const cf = colorIdx - ci;
@@ -2672,7 +2678,7 @@ export class ParticleEngine {
 
     for (let i = 0; i < steps; i++) {
       const t = i / steps;
-      const colorT = (t + time * 0.3) % 1;
+      const colorT = this.getWrappedPhase(t + this.solidRingPhase);
       const colorIdx = colorT * (rainbowColors.length - 1);
       const ci = Math.floor(colorIdx);
       const cf = colorIdx - ci;
@@ -2692,7 +2698,7 @@ export class ParticleEngine {
 
   // ─── Disc ───
   private updateDisc(_cw: number, _ch: number, _sz: number) {
-    this.discAngle = this.advanceLoopAngle(this.discAngle);
+    this.discPhase = this.advanceLoopPhase(this.discPhase);
   }
 
   private drawDisc(g: PIXI.Graphics, cw: number, ch: number, sz: number) {
@@ -2716,7 +2722,7 @@ export class ParticleEngine {
       const innerRadius = Math.max(SQUARE_CORNER_RADIUS - ringWidth, 0);
       for (let i = 0; i < steps; i++) {
         const t = i / steps;
-        const colorT = ((t + this.discAngle / (Math.PI * 2)) % 1) * (discColors.length - 1);
+        const colorT = this.getWrappedPhase(t + this.discPhase) * (discColors.length - 1);
         const ci = Math.floor(colorT);
         const cf = colorT - ci;
         const segColor = lerpColor(
@@ -2734,8 +2740,8 @@ export class ParticleEngine {
     } else {
       for (let i = 0; i < steps; i++) {
         const t = i / steps;
-        const angle1 = t * Math.PI * 2 + this.discAngle;
-        const angle2 = (t + 1 / steps) * Math.PI * 2 + this.discAngle;
+        const angle1 = (t + this.discPhase) * Math.PI * 2;
+        const angle2 = (t + 1 / steps + this.discPhase) * Math.PI * 2;
 
         const colorT = t * (discColors.length - 1);
         const ci = Math.floor(colorT);
@@ -2760,13 +2766,18 @@ export class ParticleEngine {
 
   // ─── Google One Ring ───
   private updateGoogleOne(_cw: number, _ch: number, _sz: number) {
-    this.googleOneAngle = this.advanceLoopAngle(this.googleOneAngle);
+    this.googleOnePhase = this.advanceLoopPhase(this.googleOnePhase);
   }
 
-  private advanceLoopAngle(angle: number) {
-    const turnsPerGifLoop = this.params.speed / LOOP_SPEED_BASELINE;
-    const angularVelocity = (Math.PI * 2 * turnsPerGifLoop) / GIF_LOOP_SECONDS;
-    return angle + angularVelocity * this.frameDeltaSeconds;
+  private advanceLoopPhase(phase: number) {
+    const turnsPerLoop = this.params.speed / RING_LOOP_SPEED_BASELINE;
+    const direction = this.params.direction === 'reverse' ? -1 : 1;
+    const phaseDelta = direction * turnsPerLoop * (this.frameDeltaSeconds / (RING_LOOP_DURATION_MS / 1000));
+    return this.getWrappedPhase(phase + phaseDelta);
+  }
+
+  private getWrappedPhase(phase: number) {
+    return ((phase % 1) + 1) % 1;
   }
 
   private drawGoogleOne(g: PIXI.Graphics, cw: number, ch: number, sz: number) {
@@ -2777,10 +2788,10 @@ export class ParticleEngine {
     const ringR = r - ringWidth / 2;
 
     const segments = [
-      { color: '#4285F4', degrees: 105 },
       { color: '#EA4335', degrees: 105 },
-      { color: '#FBBC05', degrees: 45 },
+      { color: '#4285F4', degrees: 105 },
       { color: '#34A853', degrees: 105 },
+      { color: '#FBBC05', degrees: 45 },
     ] as const;
 
     const totalDegrees = 360;
@@ -2816,7 +2827,7 @@ export class ParticleEngine {
       for (let i = 0; i < steps; i++) {
         const t = i / steps;
         const nextT = (i + 1) / steps;
-        const colorT = (t + this.googleOneAngle / (Math.PI * 2) + 0.25) % 1;
+        const colorT = this.getWrappedPhase(t + this.googleOnePhase);
         const segColor = resolveSegmentColor(colorT);
         const p1Outer = this.getRoundRectPoint(cx, cy, outerHalf, outerRadius, t);
         const p2Outer = this.getRoundRectPoint(cx, cy, outerHalf, outerRadius, nextT);
@@ -2830,7 +2841,7 @@ export class ParticleEngine {
     for (let i = 0; i < steps; i++) {
       const t = i / steps;
       const nextT = (i + 1) / steps;
-      const colorT = (t + this.googleOneAngle / (Math.PI * 2) + 0.25) % 1;
+      const colorT = this.getWrappedPhase(t + this.googleOnePhase);
       const segColor = resolveSegmentColor(colorT);
       const a1 = t * Math.PI * 2;
       const a2 = nextT * Math.PI * 2;
@@ -2869,9 +2880,9 @@ export class ParticleEngine {
 
     this.fireflyTime = 0;
     this.rainTime = 0;
-    this.solidRingAngle = 0;
-    this.discAngle = 0;
-    this.googleOneAngle = -Math.PI / 2;
+    this.solidRingPhase = 0;
+    this.discPhase = 0;
+    this.googleOnePhase = 0;
     this.frameDeltaSeconds = 1 / 60;
     this.lastUpdateAt = 0;
   }

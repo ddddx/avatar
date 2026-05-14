@@ -1,12 +1,15 @@
 import React from 'react';
-import type { EffectParams } from '../effects/types';
+import type { EffectParams, EffectType, RotationDirection } from '../effects/types';
 
 interface Props {
+  effect: EffectType;
   params: EffectParams;
   onChange: (p: EffectParams) => void;
 }
 
-const EffectControls: React.FC<Props> = ({ params, onChange }) => {
+const RING_EFFECTS = new Set<EffectType>(['solidring', 'disc', 'googleone']);
+
+const EffectControls: React.FC<Props> = ({ effect, params, onChange }) => {
   const set = (key: keyof EffectParams, val: number | string) => {
     onChange({ ...params, [key]: val });
   };
@@ -49,6 +52,28 @@ const EffectControls: React.FC<Props> = ({ params, onChange }) => {
           onChange={(e) => set('secondaryColor', e.target.value)}
         />
       </div>
+      {RING_EFFECTS.has(effect) && (
+        <div className="control-row direction-row">
+          <label>旋转方向</label>
+          <div className="direction-toggle">
+            <button
+              type="button"
+              className={`direction-btn ${params.direction === 'forward' ? 'active' : ''}`}
+              onClick={() => set('direction', 'forward' as RotationDirection)}
+            >
+              正转
+            </button>
+            <button
+              type="button"
+              className={`direction-btn ${params.direction === 'reverse' ? 'active' : ''}`}
+              onClick={() => set('direction', 'reverse' as RotationDirection)}
+            >
+              反转
+            </button>
+          </div>
+          <span className="val">{params.direction === 'forward' ? '顺时针' : '逆时针'}</span>
+        </div>
+      )}
     </div>
   );
 };

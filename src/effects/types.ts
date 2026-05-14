@@ -2,7 +2,12 @@ import type { Application, Container, Graphics } from 'pixi.js';
 
 export type EffectType = 'lightning' | 'fire' | 'glow' | 'orbit' | 'shield' | 'frost' | 'ripple' | 'petal' | 'stardust' | 'prism' | 'vortex' | 'firework' | 'gold' | 'spin' | 'loader' | 'matrix' | 'bubble' | 'aurora' | 'firefly' | 'rain' | 'solidring' | 'disc' | 'googleone';
 export type CropShape = 'circle' | 'square';
+export type RotationDirection = 'forward' | 'reverse';
 export const SQUARE_CORNER_RADIUS = 16;
+export const RING_LOOP_FRAME_COUNT = 30;
+export const RING_LOOP_FRAME_DELAY_MS = 67;
+export const RING_LOOP_DURATION_MS = RING_LOOP_FRAME_COUNT * RING_LOOP_FRAME_DELAY_MS;
+export const RING_LOOP_SPEED_BASELINE = 50;
 
 export interface MirrorSettings {
   flipX: boolean;
@@ -66,6 +71,7 @@ export interface EffectParams {
   speed: number;         // 1-100
   color: string;         // hex color
   secondaryColor: string;
+  direction: RotationDirection;
 }
 
 export interface AvatarState {
@@ -88,6 +94,7 @@ export const DEFAULT_PARAMS: EffectParams = {
   speed: 50,
   color: '#00d4ff',
   secondaryColor: '#ff6b35',
+  direction: 'forward',
 };
 
 export const EFFECT_PRESETS: Record<EffectType, Partial<EffectParams>> = {
@@ -111,7 +118,7 @@ export const EFFECT_PRESETS: Record<EffectType, Partial<EffectParams>> = {
   aurora:    { color: '#22d3ee', secondaryColor: '#a78bfa', density: 50, intensity: 60, speed: 35 },
   firefly:   { color: '#fbbf24', secondaryColor: '#34d399', density: 55, intensity: 50, speed: 30 },
   rain:      { color: '#60a5fa', secondaryColor: '#93c5fd', density: 60, intensity: 55, speed: 55 },
-  solidring: { color: '#00d4ff', secondaryColor: '#ff6b35', density: 50, intensity: 60, speed: 50 },
-  disc:      { color: '#00b0ff', secondaryColor: '#ff0040', density: 60, intensity: 55, speed: 50 },
-  googleone: { color: '#4285f4', secondaryColor: '#34a853', density: 50, intensity: 60, speed: 50 },
+  solidring: { color: '#00d4ff', secondaryColor: '#ff6b35', density: 50, intensity: 60, speed: 50, direction: 'forward' },
+  disc:      { color: '#00b0ff', secondaryColor: '#ff0040', density: 60, intensity: 55, speed: 50, direction: 'forward' },
+  googleone: { color: '#ea4335', secondaryColor: '#34a853', density: 50, intensity: 60, speed: 50, direction: 'forward' },
 };

@@ -387,6 +387,10 @@
   gap: 10px 12px;
 }
 
+.control-row.direction-row {
+  grid-template-columns: 72px minmax(0, 1fr) 52px;
+}
+
 .control-row input[type="color"] {
   width: 42px;
   height: 32px;
@@ -395,6 +399,31 @@
   background: transparent;
   cursor: pointer;
   padding: 0;
+}
+
+.direction-toggle {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.direction-btn {
+  min-height: 34px;
+  padding: 8px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(230, 237, 245, 0.82);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease, color 0.2s ease;
+}
+
+.direction-btn.active {
+  border-color: rgba(255, 148, 76, 0.55);
+  background: linear-gradient(135deg, rgba(255, 143, 86, 0.22), rgba(31, 182, 255, 0.2));
+  color: #ffffff;
 }
 
 /* ─── Shape Selector ─── */

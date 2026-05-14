@@ -33,6 +33,7 @@ const PreviewCanvas: React.FC<Props> = ({ image, gifData, effect, shape, mirror,
   const gifFrameRef = useRef(0);
   const gifTimerRef = useRef(0);
   const gifLastTimeRef = useRef(0);
+  const fixedDeltaMsRef = useRef<number | null>(null);
 
   // Single init + animation effect
   useEffect(() => {
@@ -180,6 +181,7 @@ const PreviewCanvas: React.FC<Props> = ({ image, gifData, effect, shape, mirror,
       engine.setEffect(effect);
       engine.setShape(shape);
       engine.setParams(params);
+      engine.setFixedDeltaMs(fixedDeltaMsRef.current);
 
       // Animation loop — draw to both glow (blurred) and sharp layers
       const tick = () => {
@@ -240,6 +242,40 @@ const PreviewCanvas: React.FC<Props> = ({ image, gifData, effect, shape, mirror,
   useEffect(() => {
     engineRef.current.setParams(params);
   }, [params]);
+
+  useEffect(() => {
+    const canvas = canvasRef as React.MutableRefObject<HTMLCanvasElement | null> | null;
+    if (!canvas?.current) return;
+    const target = canvas.current as HTMLCanvasElement & {
+      __avatarSetExportFrameStep?: (deltaMs: number | null) => void;
+      __avatarRenderFrame?: () => void;
+    };
+
+    target.__avatarSetExportFrameStep = (deltaMs: number | null) => {
+      fixedDeltaMsRef.current = deltaMs;
+      engineRef.current.setFixedDeltaMs(deltaMs);
+    };
+
+    target.__avatarRenderFrame = () => {
+      const glowGfx = glowGfxRef.current;
+      const effectsGfx = effectsGfxRef.current;
+      if (!glowGfx || !effectsGfx) return;
+
+      engineRef.current.update(SIZE, SIZE, SIZE);
+      if (effect !== 'solidring' && effect !== 'disc' && effect !== 'googleone') {
+        engineRef.current.draw(glowGfx, SIZE, SIZE, SIZE);
+      } else {
+        glowGfx.clear();
+      }
+      engineRef.current.draw(effectsGfx, SIZE, SIZE, SIZE);
+      appRef.current?.render();
+    };
+
+    return () => {
+      delete target.__avatarSetExportFrameStep;
+      delete target.__avatarRenderFrame;
+    };
+  }, [canvasRef, effect]);
 
   // Cleanup on unmount
   useEffect(() => {
