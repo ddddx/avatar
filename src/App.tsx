@@ -12,7 +12,8 @@ import {
 } from './effects/types';
 import type { EffectType, CropShape, EffectParams, MirrorSettings } from './effects/types';
 import { createRingRenderer } from './effects/ring-renderer';
-import './lib/gif.js';
+// @ts-ignore - gif.js browser bundle has no types
+import GIF from 'gif.js/dist/gif.js';
 // @ts-ignore - upng-js has no types
 import * as UPNG from 'upng-js';
 // @ts-ignore - wasm-webp has no types
@@ -24,7 +25,6 @@ const supportsMediaRecorder = typeof MediaRecorder !== 'undefined';
 const supportsWebWorkers = typeof Worker !== 'undefined';
 const GIF_TRANSPARENT_KEY = 0xff00ff;
 const RING_EFFECTS = new Set<EffectType>(['solidring', 'disc', 'googleone']);
-const GIF = (window as unknown as { GIF: any }).GIF;
 const EFFECT_LABELS: Record<EffectType, string> = {
   solidring: '实心环',
   disc: '光盘',
