@@ -113,5 +113,5 @@ export const EFFECT_PRESETS: Record<EffectType, Partial<EffectParams>> = {
   rain:      { color: '#60a5fa', secondaryColor: '#93c5fd', density: 60, intensity: 55, speed: 55 },
   solidring: { color: '#00d4ff', secondaryColor: '#ff6b35', density: 50, intensity: 60, speed: 50 },
   disc:      { color: '#00b0ff', secondaryColor: '#ff0040', density: 60, intensity: 55, speed: 50 },
-  googleone: { color: '#4285f4', secondaryColor: '#34a853', density: 50, intensity: 60, speed: 22 },
+  googleone: { color: '#4285f4', secondaryColor: '#34a853', density: 50, intensity: 60, speed: 50 },
 };

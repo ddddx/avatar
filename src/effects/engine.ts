@@ -47,6 +47,11 @@ function getSquareTrackCornerRadius(outerHalf: number, half: number) {
   return Math.max(Math.min(SQUARE_CORNER_RADIUS - inset, half), 0);
 }
 
+const GIF_LOOP_FRAME_COUNT = 30;
+const GIF_LOOP_FRAME_DELAY_MS = 67;
+const GIF_LOOP_SECONDS = (GIF_LOOP_FRAME_COUNT * GIF_LOOP_FRAME_DELAY_MS) / 1000;
+const LOOP_SPEED_BASELINE = 50;
+
 export class ParticleEngine {
   particles: Particle[] = [];
   private time = 0;
@@ -134,6 +139,8 @@ export class ParticleEngine {
 
   // Google One ring state
   private googleOneAngle = -Math.PI / 2;
+  private frameDeltaSeconds = 1 / 60;
+  private lastUpdateAt = 0;
 
   setEffect(e: EffectType) { this.effect = e; this.particles = []; this.lightningBolts = []; }
   setShape(s: CropShape) {
@@ -144,6 +151,12 @@ export class ParticleEngine {
   setParams(p: EffectParams) { this.params = p; }
 
   update(canvasW: number, canvasH: number, imgSize: number) {
+    const now = performance.now();
+    this.frameDeltaSeconds = this.lastUpdateAt
+      ? Math.min((now - this.lastUpdateAt) / 1000, 0.1)
+      : 1 / 60;
+    this.lastUpdateAt = now;
+
     const dt = (this.params.speed / 50) * 0.8;
     this.time += dt * 0.016;
 
@@ -2610,8 +2623,7 @@ export class ParticleEngine {
   // ════════════════════════════════════════════════════════════════════
 
   private updateSolidRing(_cw: number, _ch: number, _sz: number) {
-    const spd = this.params.speed / 50;
-    this.solidRingAngle += spd * 0.03;
+    this.solidRingAngle = this.advanceLoopAngle(this.solidRingAngle);
   }
 
   private drawSolidRing(g: PIXI.Graphics, cw: number, ch: number, sz: number) {
@@ -2680,8 +2692,7 @@ export class ParticleEngine {
 
   // ─── Disc ───
   private updateDisc(_cw: number, _ch: number, _sz: number) {
-    const spd = this.params.speed / 50;
-    this.discAngle += spd * 0.02;
+    this.discAngle = this.advanceLoopAngle(this.discAngle);
   }
 
   private drawDisc(g: PIXI.Graphics, cw: number, ch: number, sz: number) {
@@ -2749,8 +2760,13 @@ export class ParticleEngine {
 
   // ─── Google One Ring ───
   private updateGoogleOne(_cw: number, _ch: number, _sz: number) {
-    const spd = this.params.speed / 50;
-    this.googleOneAngle += spd * 0.01;
+    this.googleOneAngle = this.advanceLoopAngle(this.googleOneAngle);
+  }
+
+  private advanceLoopAngle(angle: number) {
+    const turnsPerGifLoop = this.params.speed / LOOP_SPEED_BASELINE;
+    const angularVelocity = (Math.PI * 2 * turnsPerGifLoop) / GIF_LOOP_SECONDS;
+    return angle + angularVelocity * this.frameDeltaSeconds;
   }
 
   private drawGoogleOne(g: PIXI.Graphics, cw: number, ch: number, sz: number) {
@@ -2856,5 +2872,7 @@ export class ParticleEngine {
     this.solidRingAngle = 0;
     this.discAngle = 0;
     this.googleOneAngle = -Math.PI / 2;
+    this.frameDeltaSeconds = 1 / 60;
+    this.lastUpdateAt = 0;
   }
 }
