@@ -2832,8 +2832,8 @@ export class ParticleEngine {
       const nextT = (i + 1) / steps;
       const colorT = (t + this.googleOneAngle / (Math.PI * 2) + 0.25) % 1;
       const segColor = resolveSegmentColor(colorT);
-      const a1 = this.googleOneAngle + t * Math.PI * 2;
-      const a2 = this.googleOneAngle + nextT * Math.PI * 2;
+      const a1 = t * Math.PI * 2;
+      const a2 = nextT * Math.PI * 2;
       g.beginPath();
       g.arc(cx, cy, ringR, a1, a2);
       g.stroke({ width: ringWidth, color: segColor, alpha: 1, cap: 'butt' });
