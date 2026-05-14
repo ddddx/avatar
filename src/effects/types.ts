@@ -1,6 +1,6 @@
 import type { Application, Container, Graphics } from 'pixi.js';
 
-export type EffectType = 'lightning' | 'fire' | 'glow' | 'orbit' | 'shield' | 'frost' | 'ripple' | 'petal' | 'stardust' | 'prism' | 'vortex' | 'firework' | 'gold' | 'spin' | 'loader' | 'matrix' | 'bubble' | 'aurora' | 'firefly' | 'rain' | 'solidring' | 'disc' | 'googleone';
+export type EffectType = 'lightning' | 'fire' | 'glow' | 'orbit' | 'shield' | 'frost' | 'ripple' | 'petal' | 'stardust' | 'prism' | 'vortex' | 'firework' | 'gold' | 'spin' | 'loader' | 'spinner' | 'matrix' | 'bubble' | 'aurora' | 'firefly' | 'rain' | 'solidring' | 'disc' | 'googleone';
 export type CropShape = 'circle' | 'square';
 export type RotationDirection = 'forward' | 'reverse';
 export const SQUARE_CORNER_RADIUS = 16;
@@ -113,6 +113,7 @@ export const EFFECT_PRESETS: Record<EffectType, Partial<EffectParams>> = {
   gold:      { color: '#fbbf24', secondaryColor: '#fde68a', density: 55, intensity: 60, speed: 40 },
   spin:      { color: '#a78bfa', secondaryColor: '#60a5fa', density: 50, intensity: 60, speed: 55 },
   loader:    { color: '#60a5fa', secondaryColor: '#a78bfa', density: 30, intensity: 50, speed: 50 },
+  spinner:   { color: '#4dc9f6', secondaryColor: '#a855f7', density: 30, intensity: 55, speed: 55 },
   matrix:    { color: '#22c55e', secondaryColor: '#16a34a', density: 60, intensity: 65, speed: 45 },
   bubble:    { color: '#67e8f9', secondaryColor: '#a5f3fc', density: 55, intensity: 55, speed: 40 },
   aurora:    { color: '#22d3ee', secondaryColor: '#a78bfa', density: 50, intensity: 60, speed: 35 },

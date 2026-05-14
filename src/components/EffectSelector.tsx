@@ -25,6 +25,7 @@ const effects: { type: EffectType; icon: string; label: string }[] = [
   { type: 'gold',      icon: '✨', label: '金粉' },
   { type: 'spin',      icon: '🔄', label: '旋转' },
   { type: 'loader',    icon: '⏳', label: '加载中' },
+  { type: 'spinner',   icon: '🌀', label: '等待圈' },
   { type: 'matrix',    icon: '🟢', label: '矩阵雨' },
   { type: 'bubble',    icon: '🫧', label: '气泡' },
   { type: 'aurora',    icon: '🌌', label: '极光' },

@@ -190,6 +190,9 @@ export class ParticleEngine {
   // Loader state
   private loaderTime = 0;
 
+  // Spinner state
+  private spinnerTime = 0;
+
   // Matrix state
   private matrixColumns: Array<{ x: number; chars: string[]; speed: number; phase: number }> = [];
   private matrixTimer = 0;
@@ -276,6 +279,7 @@ export class ParticleEngine {
       case 'gold':      this.updateGold(canvasW, canvasH, imgSize); break;
       case 'spin':      this.updateSpin(canvasW, canvasH, imgSize); break;
       case 'loader':    this.updateLoader(canvasW, canvasH, imgSize); break;
+      case 'spinner':   this.updateSpinner(canvasW, canvasH, imgSize); break;
       case 'matrix':    this.updateMatrix(canvasW, canvasH, imgSize); break;
       case 'bubble':    this.updateBubble(canvasW, canvasH, imgSize); break;
       case 'aurora':    this.updateAurora(canvasW, canvasH, imgSize); break;
@@ -305,6 +309,7 @@ export class ParticleEngine {
       case 'gold':      this.drawGold(g, canvasW, canvasH, imgSize); break;
       case 'spin':      this.drawSpin(g, canvasW, canvasH, imgSize); break;
       case 'loader':    this.drawLoader(g, canvasW, canvasH, imgSize); break;
+      case 'spinner':   this.drawSpinner(g, canvasW, canvasH, imgSize); break;
       case 'matrix':    this.drawMatrix(g, canvasW, canvasH, imgSize); break;
       case 'bubble':    this.drawBubble(g, canvasW, canvasH, imgSize); break;
       case 'aurora':    this.drawAurora(g, canvasW, canvasH, imgSize); break;
@@ -2350,6 +2355,43 @@ export class ParticleEngine {
   }
 
   // ════════════════════════════════════════════════════════════════════
+  // 🌀 SPINNER
+  // ════════════════════════════════════════════════════════════════════
+
+  private updateSpinner(_cw: number, _ch: number, _sz: number) {
+    this.spinnerTime += 0.016 * (this.params.speed / 50);
+  }
+
+  private drawSpinner(g: PIXI.Graphics, cw: number, ch: number, sz: number) {
+    const cx = cw / 2;
+    const cy = ch / 2;
+    const outerHalf = sz / 2;
+    const radius = sz * 0.28;
+    const strokeWidth = 6 + (this.params.intensity / 100) * 20;
+    const minArc = 0.14;
+    const maxArc = 0.4;
+    const pulse = (Math.sin(this.spinnerTime * 3) + 1) / 2;
+    const arcLen = minArc + (maxArc - minArc) * pulse;
+    const rotationT = ((this.spinnerTime * 0.42) % 1 + 1) % 1;
+    const startT = rotationT - arcLen * 0.82;
+    const endT = rotationT + arcLen * 0.18;
+    const colorNum = hexToNum(this.params.color);
+
+    if (this.shape === 'circle') {
+      g.arc(cx, cy, radius, startT * Math.PI * 2, endT * Math.PI * 2)
+        .stroke({ width: strokeWidth, color: colorNum, alpha: 0.98, cap: 'round' });
+    } else {
+      const half = Math.max(Math.min(radius, outerHalf - strokeWidth), 10);
+      const cornerRadius = getSquareTrackCornerRadius(outerHalf, half);
+      this.drawRoundRectSegment(g, cx, cy, half, cornerRadius, startT, endT, {
+        width: strokeWidth,
+        color: colorNum,
+        alpha: 0.98,
+      });
+    }
+  }
+
+  // ════════════════════════════════════════════════════════════════════
   // 🟢 MATRIX
   // ════════════════════════════════════════════════════════════════════
 
@@ -2938,6 +2980,7 @@ export class ParticleEngine {
     this.goldTime = 0;
     this.spinTime = 0;
     this.loaderTime = 0;
+    this.spinnerTime = 0;
     this.matrixColumns = [];
     this.matrixTimer = 0;
     this.bubbleTime = 0;

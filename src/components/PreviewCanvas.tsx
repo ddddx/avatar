@@ -17,6 +17,7 @@ interface Props {
 }
 
 const SIZE = 512;
+const NON_GLOW_EFFECTS = new Set<EffectType>(['solidring', 'disc', 'googleone', 'spinner']);
 
 const PreviewCanvas: React.FC<Props> = ({ image, gifData, effect, shape, mirror, params, canvasRef }) => {
   const isRingEffect = isRingEffectType(effect);
@@ -235,7 +236,7 @@ const PreviewCanvas: React.FC<Props> = ({ image, gifData, effect, shape, mirror,
 
       // Create glow layer (blurred, underneath) — soft light halo
       const glowGfx = new PIXI.Graphics();
-      if (effect !== 'solidring' && effect !== 'disc' && effect !== 'googleone') {
+      if (!NON_GLOW_EFFECTS.has(effect)) {
         glowGfx.blendMode = 'add';
         if (maskRef.current) glowGfx.mask = maskRef.current;
         const blurFilter = new PIXI.BlurFilter({ strength: 8, quality: 3 });
@@ -246,7 +247,7 @@ const PreviewCanvas: React.FC<Props> = ({ image, gifData, effect, shape, mirror,
 
       // Create sharp effects layer (on top) — bright cores
       const effectsGfx = new PIXI.Graphics();
-      effectsGfx.blendMode = effect === 'solidring' || effect === 'disc' || effect === 'googleone' ? 'normal' : 'add';
+      effectsGfx.blendMode = NON_GLOW_EFFECTS.has(effect) ? 'normal' : 'add';
       if (maskRef.current) effectsGfx.mask = maskRef.current;
       app.stage.addChild(effectsGfx);
       effectsGfxRef.current = effectsGfx;
@@ -264,7 +265,7 @@ const PreviewCanvas: React.FC<Props> = ({ image, gifData, effect, shape, mirror,
           engine.update(SIZE, SIZE, imgSize);
         }
 
-        if (effect !== 'solidring' && effect !== 'disc' && effect !== 'googleone') {
+        if (!NON_GLOW_EFFECTS.has(effect)) {
           engine.draw(glowGfx, SIZE, SIZE, imgSize);
         } else {
           glowGfx.clear();
@@ -380,7 +381,7 @@ const PreviewCanvas: React.FC<Props> = ({ image, gifData, effect, shape, mirror,
       if (!exportActiveRef.current || !isRingEffect) {
         engineRef.current.update(SIZE, SIZE, SIZE);
       }
-      if (effect !== 'solidring' && effect !== 'disc' && effect !== 'googleone') {
+      if (!NON_GLOW_EFFECTS.has(effect)) {
         engineRef.current.draw(glowGfx, SIZE, SIZE, SIZE);
       } else {
         glowGfx.clear();

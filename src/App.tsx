@@ -44,6 +44,7 @@ const EFFECT_LABELS: Record<EffectType, string> = {
   gold: '金粉',
   spin: '旋转',
   loader: '加载中',
+  spinner: '等待圈',
   matrix: '矩阵雨',
   bubble: '气泡',
   aurora: '极光',
