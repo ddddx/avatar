@@ -21,6 +21,7 @@ const GIF_TRANSPARENT_KEY = 0xff00ff;
 const EFFECT_LABELS: Record<EffectType, string> = {
   solidring: '实心环',
   disc: '光盘',
+  googleone: 'Google One 环',
   lightning: '闪电',
   fire: '火焰',
   glow: '炫光',
@@ -373,7 +374,7 @@ function App() {
         <h1>动态头像工作台</h1>
         <p className="subtitle">上传图片或 GIF，套用动态特效，导出支持透明背景的头像动画。</p>
         <div className="header-badges">
-          <span className="meta-pill">22 种特效</span>
+          <span className="meta-pill">23 种特效</span>
           <span className="meta-pill">圆外透明导出</span>
           <span className="meta-pill">GIF / APNG / WebP / WebM</span>
         </div>

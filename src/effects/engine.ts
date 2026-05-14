@@ -132,6 +132,9 @@ export class ParticleEngine {
   // Disc state
   private discAngle = 0;
 
+  // Google One ring state
+  private googleOneAngle = -Math.PI / 2;
+
   setEffect(e: EffectType) { this.effect = e; this.particles = []; this.lightningBolts = []; }
   setShape(s: CropShape) {
     if (this.shape === s) return;
@@ -167,6 +170,7 @@ export class ParticleEngine {
       case 'rain':      this.updateRain(canvasW, canvasH, imgSize); break;
       case 'solidring': this.updateSolidRing(canvasW, canvasH, imgSize); break;
       case 'disc':      this.updateDisc(canvasW, canvasH, imgSize); break;
+      case 'googleone': this.updateGoogleOne(canvasW, canvasH, imgSize); break;
     }
   }
 
@@ -195,6 +199,7 @@ export class ParticleEngine {
       case 'rain':      this.drawRain(g, canvasW, canvasH, imgSize); break;
       case 'solidring': this.drawSolidRing(g, canvasW, canvasH, imgSize); break;
       case 'disc':      this.drawDisc(g, canvasW, canvasH, imgSize); break;
+      case 'googleone': this.drawGoogleOne(g, canvasW, canvasH, imgSize); break;
     }
   }
 
@@ -2742,6 +2747,83 @@ export class ParticleEngine {
     }
   }
 
+  // ─── Google One Ring ───
+  private updateGoogleOne(_cw: number, _ch: number, _sz: number) {
+    const spd = this.params.speed / 50;
+    this.googleOneAngle += spd * 0.01;
+  }
+
+  private drawGoogleOne(g: PIXI.Graphics, cw: number, ch: number, sz: number) {
+    const cx = cw / 2;
+    const cy = ch / 2;
+    const r = sz / 2;
+    const ringWidth = 28 + (this.params.intensity / 100) * 24;
+    const ringR = r - ringWidth / 2;
+
+    const segments = [
+      { color: '#4285F4', degrees: 105 },
+      { color: '#EA4335', degrees: 105 },
+      { color: '#FBBC05', degrees: 45 },
+      { color: '#34A853', degrees: 105 },
+    ] as const;
+
+    const totalDegrees = 360;
+    const cumulative: Array<{ start: number; end: number; color: string }> = [];
+    let degreeCursor = 0;
+    for (const segment of segments) {
+      cumulative.push({
+        start: degreeCursor / totalDegrees,
+        end: (degreeCursor + segment.degrees) / totalDegrees,
+        color: segment.color,
+      });
+      degreeCursor += segment.degrees;
+    }
+
+    const resolveSegmentColor = (t: number) => {
+      const normalized = ((t % 1) + 1) % 1;
+      for (const segment of cumulative) {
+        if (normalized >= segment.start && normalized < segment.end) {
+          return hexToNum(segment.color);
+        }
+      }
+      return hexToNum(cumulative[cumulative.length - 1].color);
+    };
+
+    const steps = 1440;
+
+    if (this.shape === 'square') {
+      const outerHalf = Math.min(r, sz / 2);
+      const innerHalf = Math.max(outerHalf - ringWidth, 0);
+      const outerRadius = SQUARE_CORNER_RADIUS;
+      const innerRadius = Math.max(SQUARE_CORNER_RADIUS - ringWidth, 0);
+
+      for (let i = 0; i < steps; i++) {
+        const t = i / steps;
+        const nextT = (i + 1) / steps;
+        const colorT = (t + this.googleOneAngle / (Math.PI * 2) + 0.25) % 1;
+        const segColor = resolveSegmentColor(colorT);
+        const p1Outer = this.getRoundRectPoint(cx, cy, outerHalf, outerRadius, t);
+        const p2Outer = this.getRoundRectPoint(cx, cy, outerHalf, outerRadius, nextT);
+        const p2Inner = this.getRoundRectPoint(cx, cy, innerHalf, innerRadius, nextT);
+        const p1Inner = this.getRoundRectPoint(cx, cy, innerHalf, innerRadius, t);
+        drawRingQuad(g, p1Outer, p2Outer, p2Inner, p1Inner, segColor);
+      }
+      return;
+    }
+
+    for (let i = 0; i < steps; i++) {
+      const t = i / steps;
+      const nextT = (i + 1) / steps;
+      const colorT = (t + this.googleOneAngle / (Math.PI * 2) + 0.25) % 1;
+      const segColor = resolveSegmentColor(colorT);
+      const a1 = this.googleOneAngle + t * Math.PI * 2;
+      const a2 = this.googleOneAngle + nextT * Math.PI * 2;
+      g.beginPath();
+      g.arc(cx, cy, ringR, a1, a2);
+      g.stroke({ width: ringWidth, color: segColor, alpha: 1, cap: 'butt' });
+    }
+  }
+
   clear() {
     this.particles = [];
     this.lightningBolts = [];
@@ -2773,5 +2855,6 @@ export class ParticleEngine {
     this.rainTime = 0;
     this.solidRingAngle = 0;
     this.discAngle = 0;
+    this.googleOneAngle = -Math.PI / 2;
   }
 }

@@ -9,6 +9,7 @@ interface Props {
 const effects: { type: EffectType; icon: string; label: string }[] = [
   { type: 'solidring', icon: '⭕', label: '实心环' },
   { type: 'disc',      icon: '💿', label: '光盘' },
+  { type: 'googleone', icon: '🌈', label: 'Google One 环' },
   { type: 'lightning', icon: '⚡', label: '闪电' },
   { type: 'fire',      icon: '🔥', label: '火焰' },
   { type: 'glow',      icon: '✨', label: '炫光' },

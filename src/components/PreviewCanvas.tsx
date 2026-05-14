@@ -158,7 +158,7 @@ const PreviewCanvas: React.FC<Props> = ({ image, gifData, effect, shape, mirror,
 
       // Create glow layer (blurred, underneath) — soft light halo
       const glowGfx = new PIXI.Graphics();
-      if (effect !== 'solidring' && effect !== 'disc') {
+      if (effect !== 'solidring' && effect !== 'disc' && effect !== 'googleone') {
         glowGfx.blendMode = 'add';
         if (maskRef.current) glowGfx.mask = maskRef.current;
         const blurFilter = new PIXI.BlurFilter({ strength: 8, quality: 3 });
@@ -169,7 +169,7 @@ const PreviewCanvas: React.FC<Props> = ({ image, gifData, effect, shape, mirror,
 
       // Create sharp effects layer (on top) — bright cores
       const effectsGfx = new PIXI.Graphics();
-      effectsGfx.blendMode = effect === 'solidring' || effect === 'disc' ? 'normal' : 'add';
+      effectsGfx.blendMode = effect === 'solidring' || effect === 'disc' || effect === 'googleone' ? 'normal' : 'add';
       if (maskRef.current) effectsGfx.mask = maskRef.current;
       app.stage.addChild(effectsGfx);
       effectsGfxRef.current = effectsGfx;
@@ -204,9 +204,9 @@ const PreviewCanvas: React.FC<Props> = ({ image, gifData, effect, shape, mirror,
         }
 
         engine.update(SIZE, SIZE, imgSize);
-        // For solidring/disc, skip glow layer and avoid additive blending
+        // For solidring/disc/googleone, skip glow layer and avoid additive blending
         // so the ring colors stay opaque instead of brightening the image below.
-        if (effect !== 'solidring' && effect !== 'disc') {
+        if (effect !== 'solidring' && effect !== 'disc' && effect !== 'googleone') {
           engine.draw(glowGfx, SIZE, SIZE, imgSize);   // blurred glow
         } else {
           glowGfx.clear();
