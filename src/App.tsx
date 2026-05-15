@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback } from 'react';
 import type { GifData } from './lib/gif-decoder';
-import ImageUploader from './components/ImageUploader';
+import { decodeGif } from './lib/gif-decoder';
 import EffectSelector from './components/EffectSelector';
 import EffectControls from './components/EffectControls';
 import PreviewCanvas from './components/PreviewCanvas';
@@ -24,13 +24,14 @@ import './App.css';
 const supportsMediaRecorder = typeof MediaRecorder !== 'undefined';
 const supportsWebWorkers = typeof Worker !== 'undefined';
 const GIF_TRANSPARENT_KEY = 0xff00ff;
-const RING_EFFECTS = new Set<EffectType>(['solidring', 'disc', 'googleone', 'duotone', 'blinkring']);
+const RING_EFFECTS = new Set<EffectType>(['solidring', 'disc', 'googleone', 'duotone', 'blinkring', 'linxudo']);
 const EFFECT_LABELS: Record<EffectType, string> = {
   solidring: '实心环',
   disc: '光盘',
   googleone: 'Google One 环',
   duotone: '双色环',
   blinkring: '闪烁环',
+  linxudo: 'LinxuDo',
   lightning: '闪电',
   fire: '火焰',
   glow: '炫光',
@@ -131,6 +132,8 @@ type ExportDrivenCanvas = HTMLCanvasElement & {
   __avatarExtractFrame?: () => HTMLCanvasElement | null;
 };
 
+type WorkspaceTab = 'controls' | 'output';
+
 function App() {
   const [image, setImage] = useState<HTMLImageElement | null>(null);
   const [gifData, setGifData] = useState<GifData | null>(null);
@@ -142,16 +145,11 @@ function App() {
   const [exportFormat, setExportFormat] = useState<'gif' | 'webm' | 'webp' | 'apng'>(
     supportsMediaRecorder ? 'webm' : 'gif'
   );
+  const [workspaceTab, setWorkspaceTab] = useState<WorkspaceTab>('controls');
+  const [previewDragging, setPreviewDragging] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const shapeLabel = shape === 'circle' ? '圆形裁切' : '圆角矩形';
-  const mirrorLabel = mirror.flipX && mirror.flipY
-    ? '上下 + 左右'
-    : mirror.flipX
-      ? '左右'
-      : mirror.flipY
-        ? '上下'
-        : '关闭';
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const formatLabel = exportFormat === 'webm'
     ? 'WebM'
     : exportFormat === 'gif'
@@ -169,6 +167,48 @@ function App() {
     setGifData(data);
     setImage(null); // Clear static image when GIF loaded
   }, []);
+
+  const handleClearSource = useCallback(() => {
+    setImage(null);
+    setGifData(null);
+  }, []);
+
+  const handleFile = useCallback((file: File) => {
+    if (!file.type.startsWith('image/')) return;
+
+    if (file.type === 'image/gif') {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const buffer = e.target?.result as ArrayBuffer;
+        try {
+          handleGifLoad(decodeGif(buffer));
+        } catch (err) {
+          console.error('Failed to parse GIF:', err);
+          alert('GIF 文件解析失败');
+        }
+      };
+      reader.readAsArrayBuffer(file);
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const url = e.target?.result as string;
+      const img = new Image();
+      img.onload = () => handleImageLoad(img);
+      img.src = url;
+    };
+    reader.readAsDataURL(file);
+  }, [handleGifLoad, handleImageLoad]);
+
+  const handlePreviewDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setPreviewDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      handleFile(file);
+    }
+  }, [handleFile]);
 
   const handleEffectChange = useCallback((e: EffectType) => {
     setEffect(e);
@@ -529,46 +569,94 @@ function App() {
   return (
     <div className="app">
       <header className="app-header">
-        <p className="eyebrow">Avatar Motion Lab</p>
-        <h1>动态头像工作台</h1>
-        <p className="subtitle">上传图片或 GIF，套用动态特效，导出支持透明背景的头像动画。</p>
+        <div className="header-copy">
+          <div className="header-title-group">
+            <h1>动态头像工作台</h1>
+          </div>
+        </div>
         <div className="header-badges">
-          <span className="meta-pill">26 种特效</span>
+          <span className="meta-pill">27 种特效</span>
           <span className="meta-pill">圆外透明导出</span>
           <span className="meta-pill">GIF / APNG / WebP / WebM</span>
         </div>
       </header>
 
       <main className="app-main">
-        <section className="panel selector-shell">
-          <div className="section-head section-head-inline">
-            <div>
-              <p className="section-kicker">Effects</p>
-              <h2 className="section-title">特效库</h2>
-            </div>
-            <p className="section-note">先选风格，再微调密度、速度和颜色。当前特效：{EFFECT_LABELS[effect]}</p>
-          </div>
-          <div className="selector-body">
-            <EffectSelector selected={effect} onChange={handleEffectChange} />
-          </div>
-
-          <div className="studio-grid">
-            <section className="panel preview-panel">
-              <div className="section-head">
-                <div>
-                  <p className="section-kicker">Preview</p>
-                  <h2 className="section-title">实时预览</h2>
-                </div>
-                <p className="section-note">圆形模式会把圆外部分裁成透明，导出时保持一致。</p>
+        <div className="studio-grid">
+          <section className="panel preview-panel">
+            <div className="section-head">
+              <div>
+                <h2 className="section-title">实时预览</h2>
               </div>
+            </div>
+            <div className="preview-control-strip">
               <div className="preview-meta">
-                <span className="meta-pill">特效：{EFFECT_LABELS[effect]}</span>
-                <span className="meta-pill">形状：{shapeLabel}</span>
-                <span className="meta-pill">镜像：{mirrorLabel}</span>
                 <span className="meta-pill">导出：{formatLabel}</span>
               </div>
-              <div className="preview-stage">
-                <div className="preview-area">
+              <div className="preview-quickbar">
+                <div className="quick-group">
+                  <span className="quick-label">形状</span>
+                  <div className="quick-toggle">
+                    <button
+                      type="button"
+                      className={`quick-btn ${shape === 'circle' ? 'active' : ''}`}
+                      onClick={() => setShape('circle')}
+                    >
+                      ⭕ 圆形
+                    </button>
+                    <button
+                      type="button"
+                      className={`quick-btn ${shape === 'square' ? 'active' : ''}`}
+                      onClick={() => setShape('square')}
+                    >
+                      ⬜ 矩形
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div
+              className={`preview-stage ${previewDragging ? 'dragging' : ''}`}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setPreviewDragging(true);
+              }}
+              onDragLeave={() => setPreviewDragging(false)}
+              onDrop={handlePreviewDrop}
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                hidden
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    handleFile(file);
+                  }
+                  e.currentTarget.value = '';
+                }}
+              />
+              <div className="preview-toolbar">
+                <button
+                  type="button"
+                  className="toolbar-btn"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  {image || gifData ? '更换素材' : '上传素材'}
+                </button>
+                {(image || gifData) && (
+                  <button
+                    type="button"
+                    className="toolbar-btn subtle"
+                    onClick={handleClearSource}
+                  >
+                    清空
+                  </button>
+                )}
+              </div>
+              <div className="preview-area">
+                <div className="preview-stack">
                   <PreviewCanvas
                     image={image}
                     gifData={gifData}
@@ -578,141 +666,140 @@ function App() {
                     params={params}
                     canvasRef={canvasRef}
                   />
+                  {!image && !gifData && (
+                    <div className="preview-status-hint">
+                      纯特效预览中，可拖拽图片或 GIF 到这里
+                    </div>
+                  )}
                 </div>
+              </div>
+            </div>
+          </section>
+
+          <aside className="side-rail">
+            <section className="panel selector-shell side-panel">
+              <div className="section-head">
+                <div className="selector-head-main">
+                  <div className="selector-title-row">
+                    <h2 className="section-title">特效库</h2>
+                    <span className="selector-current">当前特效：{EFFECT_LABELS[effect]}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="selector-body">
+                <EffectSelector selected={effect} onChange={handleEffectChange} />
               </div>
             </section>
 
-            <aside className="control-rail">
-              <section className="panel upload-panel">
-                <div className="section-head">
-                  <div>
-                    <p className="section-kicker">Source</p>
-                    <h2 className="section-title">素材</h2>
-                  </div>
-                  <p className="section-note">支持静态图和 GIF，拖拽到卡片内即可替换。</p>
+            <section className="panel workspace-panel side-panel">
+              <div className="section-head">
+                <div>
+                  <h2 className="section-title">调节与导出</h2>
                 </div>
-                <ImageUploader onImageLoad={handleImageLoad} onGifLoad={handleGifLoad} />
-              </section>
+              </div>
+              <div className="workspace-tabs">
+                <button
+                  type="button"
+                  className={`workspace-tab ${workspaceTab === 'controls' ? 'active' : ''}`}
+                  onClick={() => setWorkspaceTab('controls')}
+                >
+                  调节
+                </button>
+                <button
+                  type="button"
+                  className={`workspace-tab ${workspaceTab === 'output' ? 'active' : ''}`}
+                  onClick={() => setWorkspaceTab('output')}
+                >
+                  导出
+                </button>
+              </div>
 
-              <section className="panel controls-panel">
-                <div className="section-head">
-                  <div>
-                    <p className="section-kicker">Controls</p>
-                    <h2 className="section-title">细节调节</h2>
-                  </div>
-                  <p className="section-note">调粒子密度、强度、速度和主副色，找到最适合头像的节奏。</p>
+              {workspaceTab === 'controls' ? (
+                <div className="workspace-body">
+                  <EffectControls effect={effect} params={params} onChange={setParams} />
                 </div>
-                <EffectControls effect={effect} params={params} onChange={setParams} />
-              </section>
-
-              <section className="panel output-panel">
-                <div className="section-head">
-                  <div>
-                    <p className="section-kicker">Output</p>
-                    <h2 className="section-title">裁切与导出</h2>
-                  </div>
-                  <p className="section-note">先确定头像外形，再选择导出格式。透明背景优先用 APNG、WebP 或 WebM。</p>
-                </div>
-
-                <div className="output-group">
-                  <div className="group-label">头像形状</div>
-                  <div className="shape-selector">
-                    <button
-                      className={`shape-btn ${shape === 'circle' ? 'active' : ''}`}
-                      onClick={() => setShape('circle')}
-                    >
-                      <span className="shape-icon">⭕</span>
-                      <span>圆形</span>
-                    </button>
-                    <button
-                      className={`shape-btn ${shape === 'square' ? 'active' : ''}`}
-                      onClick={() => setShape('square')}
-                    >
-                      <span className="shape-icon">⬜</span>
-                      <span>矩形</span>
-                    </button>
-                  </div>
-                </div>
-
-                <div className="output-group">
-                  <div className="group-label">镜像</div>
-                  <div className="mirror-selector">
-                    <button
-                      className={`shape-btn ${mirror.flipX ? 'active' : ''}`}
-                      onClick={() => setMirror((prev) => ({ ...prev, flipX: !prev.flipX }))}
-                    >
-                      <span className="shape-icon">↔</span>
-                      <span>左右镜像</span>
-                    </button>
-                    <button
-                      className={`shape-btn ${mirror.flipY ? 'active' : ''}`}
-                      onClick={() => setMirror((prev) => ({ ...prev, flipY: !prev.flipY }))}
-                    >
-                      <span className="shape-icon">↕</span>
-                      <span>上下镜像</span>
-                    </button>
-                  </div>
-                </div>
-
-                <div className="output-group">
-                  <div className="group-label">导出格式</div>
-                  <div className="export-controls">
-                    <div className="format-toggle">
+              ) : (
+                <div className="workspace-body">
+                  <div className="output-group">
+                    <div className="group-label">镜像</div>
+                    <div className="mirror-selector">
                       <button
-                        className={`format-btn ${exportFormat === 'webm' ? 'active' : ''}`}
-                        onClick={() => setExportFormat('webm')}
-                        disabled={!supportsMediaRecorder}
-                        title="WebM 视频，支持半透明"
+                        className={`shape-btn ${mirror.flipX ? 'active' : ''}`}
+                        onClick={() => setMirror((prev) => ({ ...prev, flipX: !prev.flipX }))}
                       >
-                        🎬 WebM
+                        <span className="shape-icon">↔</span>
+                        <span>左右镜像</span>
                       </button>
                       <button
-                        className={`format-btn ${exportFormat === 'gif' ? 'active' : ''}`}
-                        onClick={() => setExportFormat('gif')}
-                        disabled={!supportsWebWorkers}
-                        title="GIF 动图，不支持半透明"
+                        className={`shape-btn ${mirror.flipY ? 'active' : ''}`}
+                        onClick={() => setMirror((prev) => ({ ...prev, flipY: !prev.flipY }))}
                       >
-                        🖼️ GIF
-                      </button>
-                      <button
-                        className={`format-btn ${exportFormat === 'apng' ? 'active' : ''}`}
-                        onClick={() => setExportFormat('apng')}
-                        title="动画PNG，支持完整半透明"
-                      >
-                        🎞️ APNG
-                      </button>
-                      <button
-                        className={`format-btn ${exportFormat === 'webp' ? 'active' : ''}`}
-                        onClick={() => setExportFormat('webp')}
-                        title="动画 WebP，支持半透明（Chrome/Edge）"
-                      >
-                        🎬 WebP
+                        <span className="shape-icon">↕</span>
+                        <span>上下镜像</span>
                       </button>
                     </div>
-                    {exporting && (
-                      <div className="export-progress">
-                        <div
-                          className="export-progress-bar"
-                          style={{ width: `${Math.round(exportProgress * 100)}%` }}
-                        />
-                        <span className="export-progress-text">
-                          {Math.round(exportProgress * 100)}%
-                        </span>
+                  </div>
+
+                  <div className="output-group">
+                    <div className="group-label">导出格式</div>
+                    <div className="export-controls">
+                      <div className="format-toggle">
+                        <button
+                          className={`format-btn ${exportFormat === 'webm' ? 'active' : ''}`}
+                          onClick={() => setExportFormat('webm')}
+                          disabled={!supportsMediaRecorder}
+                          title="WebM 视频，支持半透明"
+                        >
+                          🎬 WebM
+                        </button>
+                        <button
+                          className={`format-btn ${exportFormat === 'gif' ? 'active' : ''}`}
+                          onClick={() => setExportFormat('gif')}
+                          disabled={!supportsWebWorkers}
+                          title="GIF 动图，不支持半透明"
+                        >
+                          🖼️ GIF
+                        </button>
+                        <button
+                          className={`format-btn ${exportFormat === 'apng' ? 'active' : ''}`}
+                          onClick={() => setExportFormat('apng')}
+                          title="动画PNG，支持完整半透明"
+                        >
+                          🎞️ APNG
+                        </button>
+                        <button
+                          className={`format-btn ${exportFormat === 'webp' ? 'active' : ''}`}
+                          onClick={() => setExportFormat('webp')}
+                          title="动画 WebP，支持半透明（Chrome/Edge）"
+                        >
+                          🎬 WebP
+                        </button>
                       </div>
-                    )}
-                    <button
-                      className="export-btn"
-                      onClick={handleExport}
-                      disabled={exporting}
-                    >
-                      {exporting ? '正在导出…' : `导出 ${formatLabel}`}
-                    </button>
+                      {exporting && (
+                        <div className="export-progress">
+                          <div
+                            className="export-progress-bar"
+                            style={{ width: `${Math.round(exportProgress * 100)}%` }}
+                          />
+                          <span className="export-progress-text">
+                            {Math.round(exportProgress * 100)}%
+                          </span>
+                        </div>
+                      )}
+                      <button
+                        className="export-btn"
+                        onClick={handleExport}
+                        disabled={exporting}
+                      >
+                        {exporting ? '正在导出…' : `导出 ${formatLabel}`}
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </section>
-            </aside>
-          </div>
-        </section>
+              )}
+            </section>
+          </aside>
+        </div>
       </main>
     </div>
   );

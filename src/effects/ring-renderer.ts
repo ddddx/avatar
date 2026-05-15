@@ -6,7 +6,7 @@ import {
 import type { CropShape, EffectParams, EffectType, MirrorSettings } from './types';
 import type { GifData } from '../lib/gif-decoder';
 
-const RING_EFFECTS = new Set<EffectType>(['solidring', 'disc', 'googleone', 'duotone', 'blinkring']);
+const RING_EFFECTS = new Set<EffectType>(['solidring', 'disc', 'googleone', 'duotone', 'blinkring', 'linxudo']);
 const SOLID_RING_COLORS = ['#ff0040', '#ff8000', '#00ff80', '#00b0ff', '#ff0040'];
 const DISC_COLORS = ['#ff0040', '#ff8000', '#ffe000', '#00ff80', '#00b0ff', '#a040ff', '#ff0040'];
 const GOOGLE_ONE_SEGMENTS = [
@@ -30,6 +30,7 @@ type RingAnimationState = {
   phase: number;
   alpha: number;
   widthScale: number;
+  pulse: number;
 };
 
 function wrapUnit(value: number) {
@@ -136,11 +137,13 @@ function getDuotoneSegmentCount(density: number) {
 
 function getRingAnimationState(params: EffectParams, progress: number): RingAnimationState {
   if (params.ringAnimationMode === 'breathe') {
-    const pulse = 0.5 - 0.5 * Math.cos(progress * Math.PI * 2);
+    const pulseProgress = wrapUnit(progress * 2);
+    const pulse = 0.5 - 0.5 * Math.cos(pulseProgress * Math.PI * 2);
     return {
       phase: 0,
-      alpha: 0.4 + pulse * 0.6,
+      alpha: pulse,
       widthScale: 0.88 + pulse * 0.22,
+      pulse,
     };
   }
 
@@ -149,7 +152,41 @@ function getRingAnimationState(params: EffectParams, progress: number): RingAnim
     phase: wrapUnit(progress * direction),
     alpha: 1,
     widthScale: 1,
+    pulse: 0.5,
   };
+}
+
+function drawLinxuDo(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  animation: RingAnimationState,
+) {
+  const radius = Math.min(width, height) / 2;
+  const diameter = radius * 2;
+  const bandHeight = diameter / 3;
+  const scale = animation.alpha < 1 ? 0.9 + animation.pulse * 0.1 : 1;
+
+  ctx.save();
+  ctx.translate(width / 2, height / 2);
+  if (animation.phase) {
+    ctx.rotate(animation.phase * Math.PI * 2);
+  }
+  ctx.scale(scale, scale);
+  ctx.globalAlpha = animation.alpha;
+
+  ctx.beginPath();
+  ctx.arc(0, 0, radius, 0, Math.PI * 2);
+  ctx.closePath();
+  ctx.clip();
+
+  ctx.fillStyle = '#000000';
+  ctx.fillRect(-radius, -radius, diameter, bandHeight);
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(-radius, -radius + bandHeight, diameter, bandHeight);
+  ctx.fillStyle = '#D4AF37';
+  ctx.fillRect(-radius, -radius + bandHeight * 2, diameter, bandHeight);
+  ctx.restore();
 }
 
 function createRingPaint(
@@ -290,6 +327,11 @@ export function createRingRenderer({
       }
 
       const animation = getRingAnimationState(params, progress);
+      if (effect === 'linxudo') {
+        drawLinxuDo(ctx, width, height, animation);
+        return;
+      }
+
       const ringWidthBase = effect === 'solidring'
         ? 4 + (params.intensity / 100) * 36
         : effect === 'disc'

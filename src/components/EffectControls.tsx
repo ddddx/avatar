@@ -7,8 +7,23 @@ interface Props {
   onChange: (p: EffectParams) => void;
 }
 
-const DIRECTION_EFFECTS = new Set<EffectType>(['solidring', 'disc', 'googleone', 'duotone']);
-const RING_EFFECTS = new Set<EffectType>(['solidring', 'disc', 'googleone', 'duotone', 'blinkring']);
+const DIRECTION_EFFECTS = new Set<EffectType>(['solidring', 'disc', 'googleone', 'duotone', 'linxudo']);
+const RING_EFFECTS = new Set<EffectType>(['solidring', 'disc', 'googleone', 'duotone', 'blinkring', 'linxudo']);
+const COLOR_EFFECTS = new Set<EffectType>([
+  'lightning', 'fire', 'glow', 'orbit', 'shield', 'frost', 'ripple', 'petal', 'stardust', 'prism',
+  'vortex', 'firework', 'gold', 'spin', 'loader', 'spinner', 'matrix', 'bubble', 'aurora', 'firefly',
+  'rain', 'solidring', 'disc', 'duotone', 'blinkring',
+]);
+const DENSITY_EFFECTS = new Set<EffectType>([
+  'lightning', 'fire', 'glow', 'orbit', 'shield', 'frost', 'ripple', 'petal', 'stardust', 'prism',
+  'vortex', 'firework', 'gold', 'spin', 'loader', 'spinner', 'matrix', 'bubble', 'aurora', 'firefly',
+  'rain', 'duotone',
+]);
+const INTENSITY_EFFECTS = new Set<EffectType>([
+  'lightning', 'fire', 'glow', 'orbit', 'shield', 'frost', 'ripple', 'petal', 'stardust', 'prism',
+  'vortex', 'firework', 'gold', 'spin', 'loader', 'spinner', 'matrix', 'bubble', 'aurora', 'firefly',
+  'rain', 'solidring', 'disc', 'googleone', 'duotone', 'blinkring',
+]);
 
 const EffectControls: React.FC<Props> = ({ effect, params, onChange }) => {
   const set = (key: keyof EffectParams, val: number | string) => {
@@ -17,22 +32,26 @@ const EffectControls: React.FC<Props> = ({ effect, params, onChange }) => {
 
   return (
     <div className="effect-controls">
-      <div className="control-row">
-        <label>粒子密度</label>
-        <input
-          type="range" min={1} max={100} value={params.density}
-          onChange={(e) => set('density', +e.target.value)}
-        />
-        <span className="val">{params.density}</span>
-      </div>
-      <div className="control-row">
-        <label>特效强度</label>
-        <input
-          type="range" min={1} max={100} value={params.intensity}
-          onChange={(e) => set('intensity', +e.target.value)}
-        />
-        <span className="val">{params.intensity}</span>
-      </div>
+      {DENSITY_EFFECTS.has(effect) && (
+        <div className="control-row">
+          <label>粒子密度</label>
+          <input
+            type="range" min={1} max={100} value={params.density}
+            onChange={(e) => set('density', +e.target.value)}
+          />
+          <span className="val">{params.density}</span>
+        </div>
+      )}
+      {INTENSITY_EFFECTS.has(effect) && (
+        <div className="control-row">
+          <label>特效强度</label>
+          <input
+            type="range" min={1} max={100} value={params.intensity}
+            onChange={(e) => set('intensity', +e.target.value)}
+          />
+          <span className="val">{params.intensity}</span>
+        </div>
+      )}
       <div className="control-row">
         <label>动画速度</label>
         <input
@@ -41,18 +60,20 @@ const EffectControls: React.FC<Props> = ({ effect, params, onChange }) => {
         />
         <span className="val">{params.speed}</span>
       </div>
-      <div className="control-row colors">
-        <label>主色</label>
-        <input
-          type="color" value={params.color}
-          onChange={(e) => set('color', e.target.value)}
-        />
-        <label>副色</label>
-        <input
-          type="color" value={params.secondaryColor}
-          onChange={(e) => set('secondaryColor', e.target.value)}
-        />
-      </div>
+      {COLOR_EFFECTS.has(effect) && (
+        <div className="control-row colors">
+          <label>主色</label>
+          <input
+            type="color" value={params.color}
+            onChange={(e) => set('color', e.target.value)}
+          />
+          <label>副色</label>
+          <input
+            type="color" value={params.secondaryColor}
+            onChange={(e) => set('secondaryColor', e.target.value)}
+          />
+        </div>
+      )}
       {RING_EFFECTS.has(effect) && (
         <div className="control-row direction-row">
           <label>动画模式</label>
