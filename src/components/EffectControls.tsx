@@ -1,5 +1,5 @@
 import React from 'react';
-import type { EffectParams, EffectType, RotationDirection } from '../effects/types';
+import type { EffectParams, EffectType, RingAnimationMode, RotationDirection } from '../effects/types';
 
 interface Props {
   effect: EffectType;
@@ -8,6 +8,7 @@ interface Props {
 }
 
 const DIRECTION_EFFECTS = new Set<EffectType>(['solidring', 'disc', 'googleone', 'duotone']);
+const RING_EFFECTS = new Set<EffectType>(['solidring', 'disc', 'googleone', 'duotone', 'blinkring']);
 
 const EffectControls: React.FC<Props> = ({ effect, params, onChange }) => {
   const set = (key: keyof EffectParams, val: number | string) => {
@@ -52,7 +53,29 @@ const EffectControls: React.FC<Props> = ({ effect, params, onChange }) => {
           onChange={(e) => set('secondaryColor', e.target.value)}
         />
       </div>
-      {DIRECTION_EFFECTS.has(effect) && (
+      {RING_EFFECTS.has(effect) && (
+        <div className="control-row direction-row">
+          <label>动画模式</label>
+          <div className="direction-toggle">
+            <button
+              type="button"
+              className={`direction-btn ${params.ringAnimationMode === 'rotate' ? 'active' : ''}`}
+              onClick={() => set('ringAnimationMode', 'rotate' as RingAnimationMode)}
+            >
+              旋转
+            </button>
+            <button
+              type="button"
+              className={`direction-btn ${params.ringAnimationMode === 'breathe' ? 'active' : ''}`}
+              onClick={() => set('ringAnimationMode', 'breathe' as RingAnimationMode)}
+            >
+              呼吸灯
+            </button>
+          </div>
+          <span className="val">{params.ringAnimationMode === 'rotate' ? '环形旋转' : '明暗呼吸'}</span>
+        </div>
+      )}
+      {params.ringAnimationMode === 'rotate' && DIRECTION_EFFECTS.has(effect) && (
         <div className="control-row direction-row">
           <label>旋转方向</label>
           <div className="direction-toggle">

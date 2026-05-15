@@ -3,6 +3,7 @@ import type { Application, Container, Graphics } from 'pixi.js';
 export type EffectType = 'lightning' | 'fire' | 'glow' | 'orbit' | 'shield' | 'frost' | 'ripple' | 'petal' | 'stardust' | 'prism' | 'vortex' | 'firework' | 'gold' | 'spin' | 'loader' | 'spinner' | 'matrix' | 'bubble' | 'aurora' | 'firefly' | 'rain' | 'solidring' | 'disc' | 'googleone' | 'duotone' | 'blinkring';
 export type CropShape = 'circle' | 'square';
 export type RotationDirection = 'forward' | 'reverse';
+export type RingAnimationMode = 'rotate' | 'breathe';
 export const SQUARE_CORNER_RADIUS = 16;
 export const RING_LOOP_FRAME_COUNT = 30;
 export const RING_LOOP_FRAME_DELAY_MS = 67;
@@ -71,6 +72,7 @@ export interface EffectParams {
   speed: number;         // 1-100
   color: string;         // hex color
   secondaryColor: string;
+  ringAnimationMode: RingAnimationMode;
   direction: RotationDirection;
 }
 
@@ -94,6 +96,7 @@ export const DEFAULT_PARAMS: EffectParams = {
   speed: 50,
   color: '#00d4ff',
   secondaryColor: '#ff6b35',
+  ringAnimationMode: 'rotate',
   direction: 'forward',
 };
 
@@ -119,9 +122,9 @@ export const EFFECT_PRESETS: Record<EffectType, Partial<EffectParams>> = {
   aurora:    { color: '#22d3ee', secondaryColor: '#a78bfa', density: 50, intensity: 60, speed: 35 },
   firefly:   { color: '#fbbf24', secondaryColor: '#34d399', density: 55, intensity: 50, speed: 30 },
   rain:      { color: '#60a5fa', secondaryColor: '#93c5fd', density: 60, intensity: 55, speed: 55 },
-  solidring: { color: '#00d4ff', secondaryColor: '#ff6b35', density: 50, intensity: 60, speed: 50, direction: 'forward' },
-  disc:      { color: '#00b0ff', secondaryColor: '#ff0040', density: 60, intensity: 55, speed: 50, direction: 'forward' },
-  googleone: { color: '#ea4335', secondaryColor: '#34a853', density: 50, intensity: 60, speed: 50, direction: 'forward' },
-  duotone:   { color: '#00d4ff', secondaryColor: '#ff6b35', density: 50, intensity: 58, speed: 50, direction: 'forward' },
-  blinkring: { color: '#00d4ff', secondaryColor: '#ff6b35', density: 50, intensity: 58, speed: 50, direction: 'forward' },
+  solidring: { color: '#00d4ff', secondaryColor: '#ff6b35', density: 50, intensity: 60, speed: 50, ringAnimationMode: 'rotate', direction: 'forward' },
+  disc:      { color: '#00b0ff', secondaryColor: '#ff0040', density: 60, intensity: 55, speed: 50, ringAnimationMode: 'rotate', direction: 'forward' },
+  googleone: { color: '#ea4335', secondaryColor: '#34a853', density: 50, intensity: 60, speed: 50, ringAnimationMode: 'rotate', direction: 'forward' },
+  duotone:   { color: '#00d4ff', secondaryColor: '#ff6b35', density: 50, intensity: 58, speed: 50, ringAnimationMode: 'rotate', direction: 'forward' },
+  blinkring: { color: '#00d4ff', secondaryColor: '#ff6b35', density: 50, intensity: 58, speed: 50, ringAnimationMode: 'rotate', direction: 'forward' },
 };

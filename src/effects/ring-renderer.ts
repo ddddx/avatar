@@ -26,6 +26,12 @@ export function getRingAnimationProgress(speed: number, elapsedMs: number) {
   return wrapUnit((elapsedMs / RING_LOOP_DURATION_MS) * turnsPerLoop);
 }
 
+type RingAnimationState = {
+  phase: number;
+  alpha: number;
+  widthScale: number;
+};
+
 function wrapUnit(value: number) {
   return ((value % 1) + 1) % 1;
 }
@@ -126,6 +132,24 @@ function addSampledPaletteStops(gradient: CanvasGradient, colors: readonly strin
 function getDuotoneSegmentCount(density: number) {
   const pairCount = Math.max(1, Math.round(1 + (density / 100) * 23));
   return pairCount * 2;
+}
+
+function getRingAnimationState(params: EffectParams, progress: number): RingAnimationState {
+  if (params.ringAnimationMode === 'breathe') {
+    const pulse = 0.5 - 0.5 * Math.cos(progress * Math.PI * 2);
+    return {
+      phase: 0,
+      alpha: 0.4 + pulse * 0.6,
+      widthScale: 0.88 + pulse * 0.22,
+    };
+  }
+
+  const direction = params.direction === 'reverse' ? -1 : 1;
+  return {
+    phase: wrapUnit(progress * direction),
+    alpha: 1,
+    widthScale: 1,
+  };
 }
 
 function createRingPaint(
@@ -265,20 +289,23 @@ export function createRingRenderer({
         ctx.restore();
       }
 
-      const direction = params.direction === 'reverse' ? -1 : 1;
-      const phase = wrapUnit(progress * direction);
-      const ringWidth = effect === 'solidring'
+      const animation = getRingAnimationState(params, progress);
+      const ringWidthBase = effect === 'solidring'
         ? 4 + (params.intensity / 100) * 36
         : effect === 'disc'
           ? 15 + (params.intensity / 100) * 35
           : effect === 'duotone' || effect === 'blinkring'
             ? 10 + (params.intensity / 100) * 34
             : 28 + (params.intensity / 100) * 24;
+      const ringWidth = ringWidthBase * animation.widthScale;
 
-      const paint = createRingPaint(ctx, effect, params, phase, width, height);
+      const paint = createRingPaint(ctx, effect, params, animation.phase, width, height);
       appendRingPath(ctx, shape, width, height, ringWidth);
+      ctx.save();
+      ctx.globalAlpha = animation.alpha;
       ctx.fillStyle = paint;
       ctx.fill(shape === 'square' ? 'evenodd' : undefined);
+      ctx.restore();
     },
   };
 }

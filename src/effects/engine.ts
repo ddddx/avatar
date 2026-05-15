@@ -135,7 +135,7 @@ export class ParticleEngine {
   private shape: CropShape = 'circle';
   private params: EffectParams = {
     density: 50, intensity: 50, speed: 50,
-    color: '#00d4ff', secondaryColor: '#ff6b35', direction: 'forward',
+    color: '#00d4ff', secondaryColor: '#ff6b35', ringAnimationMode: 'rotate', direction: 'forward',
   };
 
   // Lightning state
