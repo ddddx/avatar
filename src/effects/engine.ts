@@ -249,6 +249,10 @@ export class ParticleEngine {
     this.googleOnePhase = phase;
   }
 
+  private getSpeedStep() {
+    return Math.max(this.params.speed / 50, 0.02);
+  }
+
   update(canvasW: number, canvasH: number, imgSize: number) {
     if (this.fixedDeltaSeconds != null) {
       this.frameDeltaSeconds = this.fixedDeltaSeconds;
@@ -534,11 +538,12 @@ export class ParticleEngine {
   }
 
   private updateLightning(cw: number, ch: number, sz: number) {
-    const spd = this.params.speed / 50;
+    const speedStep = this.getSpeedStep();
+    const spd = speedStep;
     this.lightningTimer += spd;
 
     this.lightningBolts = this.lightningBolts.filter(b => {
-      b.life -= 1;
+      b.life -= speedStep;
       return b.life > 0;
     });
 
@@ -602,11 +607,11 @@ export class ParticleEngine {
         p.trail.push({ x: p.x, y: p.y, alpha: p.alpha, size: p.size });
         if (p.trail.length > 4) p.trail.shift();
       }
-      p.x += p.vx;
-      p.y += p.vy;
-      p.vx *= 0.95;
-      p.vy *= 0.95;
-      p.life -= 1;
+      p.x += p.vx * speedStep;
+      p.y += p.vy * speedStep;
+      p.vx *= Math.pow(0.95, speedStep);
+      p.vy *= Math.pow(0.95, speedStep);
+      p.life -= speedStep;
       return p.life > 0;
     });
   }
@@ -686,7 +691,8 @@ export class ParticleEngine {
   // ════════════════════════════════════════════════════════════════════
 
   private updateFire(cw: number, ch: number, sz: number) {
-    const spd = this.params.speed / 50;
+    const speedStep = this.getSpeedStep();
+    const spd = speedStep;
     const spawnRate = Math.floor(this.params.density / 4) + 2;
     const ext = (this.params.intensity / 100);
     const cx = cw / 2, cy = ch / 2, r = sz / 2;
@@ -716,14 +722,14 @@ export class ParticleEngine {
         p.trail.push({ x: p.x, y: p.y, alpha: p.alpha, size: p.size });
         if (p.trail.length > 5) p.trail.shift();
       }
-      p.vx += (Math.random() - 0.5) * 0.35;
-      p.vy -= 0.04;
-      p.x += p.vx;
-      p.y += p.vy;
-      p.vx *= 0.98;
-      p.vy *= 0.99;
-      p.size *= 0.985;
-      p.life -= 1;
+      p.vx += (Math.random() - 0.5) * 0.35 * speedStep;
+      p.vy -= 0.04 * speedStep;
+      p.x += p.vx * speedStep;
+      p.y += p.vy * speedStep;
+      p.vx *= Math.pow(0.98, speedStep);
+      p.vy *= Math.pow(0.99, speedStep);
+      p.size *= Math.pow(0.985, speedStep);
+      p.life -= speedStep;
       return p.life > 0 && p.size > 0.5;
     });
   }
@@ -792,7 +798,8 @@ export class ParticleEngine {
   // ════════════════════════════════════════════════════════════════════
 
   private updateGlow(cw: number, ch: number, sz: number) {
-    this.glowPhase += 0.015 * (this.params.speed / 50);
+    const speedStep = this.getSpeedStep();
+    this.glowPhase += 0.015 * speedStep;
     const count = Math.floor(this.params.density / 2) + 15;
     const cx = cw / 2, cy = ch / 2, r = sz / 2;
 
@@ -834,9 +841,9 @@ export class ParticleEngine {
     }
 
     this.particles = this.particles.filter(p => {
-      p.x += p.vx;
-      p.y += p.vy;
-      p.life -= 1;
+      p.x += p.vx * speedStep;
+      p.y += p.vy * speedStep;
+      p.life -= speedStep;
       return p.life > 0;
     });
   }
@@ -968,7 +975,8 @@ export class ParticleEngine {
   // ════════════════════════════════════════════════════════════════════
 
   private updateOrbit(cw: number, ch: number, sz: number) {
-    this.orbitAngle += 0.008 * (this.params.speed / 50);
+    const speedStep = this.getSpeedStep();
+    this.orbitAngle += 0.008 * speedStep;
     const cx = cw / 2, cy = ch / 2;
     const layerCount = 2 + Math.floor(this.params.intensity / 25);
     const targetPerLayer = Math.floor(this.params.density / layerCount / 3) + 3;
@@ -983,7 +991,7 @@ export class ParticleEngine {
       for (let i = 0; i < toSpawn; i++) {
         const angle = this.shape === 'circle' ? Math.random() * Math.PI * 2 : Math.random();
         const speedMult = 1 + (layerCount - layer) * 0.3;
-        const angularSpeed = (0.012 + Math.random() * 0.02) * (this.params.speed / 50) * speedMult;
+        const angularSpeed = (0.012 + Math.random() * 0.02) * speedMult;
         const isDust = Math.random() < 0.3;
 
         this.particles.push({
@@ -1008,11 +1016,11 @@ export class ParticleEngine {
 
     this.particles = this.particles.filter(p => {
       if (this.shape === 'circle') {
-        p.angle = (p.angle ?? 0) + (p.angularSpeed ?? 0);
+        p.angle = (p.angle ?? 0) + (p.angularSpeed ?? 0) * speedStep;
         p.x = cx + Math.cos(p.angle ?? 0) * (p.radius ?? 0);
         p.y = cy + Math.sin(p.angle ?? 0) * (p.radius ?? 0);
       } else {
-        p.angle = (((p.angle ?? 0) + (p.angularSpeed ?? 0) / (Math.PI * 2)) % 1 + 1) % 1;
+        p.angle = (((p.angle ?? 0) + ((p.angularSpeed ?? 0) * speedStep) / (Math.PI * 2)) % 1 + 1) % 1;
         const half = Math.max(Math.min(p.radius ?? 0, outerHalf - 4), 8);
         const cornerRadius = getSquareTrackCornerRadius(outerHalf, half);
         const pt = this.getRoundRectPoint(cx, cy, half, cornerRadius, p.angle ?? 0);
@@ -1025,7 +1033,7 @@ export class ParticleEngine {
         if (p.trail.length > 6) p.trail.shift();
       }
 
-      p.life -= 1;
+      p.life -= speedStep;
       return p.life > 0;
     });
   }
@@ -1105,8 +1113,9 @@ export class ParticleEngine {
   // ════════════════════════════════════════════════════════════════════
 
   private updateShield(cw: number, ch: number, sz: number) {
-    this.shieldPhase += 0.012 * (this.params.speed / 50);
-    if (this.shieldHitTimer > 0) this.shieldHitTimer -= 0.02;
+    const speedStep = this.getSpeedStep();
+    this.shieldPhase += 0.012 * speedStep;
+    if (this.shieldHitTimer > 0) this.shieldHitTimer -= 0.02 * speedStep;
 
     const cx = cw / 2, cy = ch / 2;
     const segCount = Math.floor(this.params.density * 1.5) + 20;
@@ -1123,7 +1132,7 @@ export class ParticleEngine {
         vx: 0, vy: 0,
         angle,
         radius: baseR + (Math.random() - 0.5) * 5,
-        angularSpeed: (0.01 + Math.random() * 0.02) * (ring % 2 === 0 ? 1 : -1) * (this.params.speed / 50),
+        angularSpeed: (0.01 + Math.random() * 0.02) * (ring % 2 === 0 ? 1 : -1),
         orbitLayer: ring,
         life: isArc ? 10 + Math.random() * 20 : 400 + Math.random() * 300,
         maxLife: isArc ? 30 : 700,
@@ -1142,11 +1151,11 @@ export class ParticleEngine {
         : 0;
       const r = (p.radius ?? 0) * pulse + hitShake;
       if (this.shape === 'circle') {
-        p.angle = (p.angle ?? 0) + (p.angularSpeed ?? 0);
+        p.angle = (p.angle ?? 0) + (p.angularSpeed ?? 0) * speedStep;
         p.x = cx + Math.cos(p.angle ?? 0) * r;
         p.y = cy + Math.sin(p.angle ?? 0) * r;
       } else {
-        p.angle = (((p.angle ?? 0) + (p.angularSpeed ?? 0) / (Math.PI * 2)) % 1 + 1) % 1;
+        p.angle = (((p.angle ?? 0) + ((p.angularSpeed ?? 0) * speedStep) / (Math.PI * 2)) % 1 + 1) % 1;
         const half = Math.max(Math.min(r, outerHalf - 4), 8);
         const cornerRadius = getSquareTrackCornerRadius(outerHalf, half);
         const pt = this.getRoundRectPoint(cx, cy, half, cornerRadius, p.angle ?? 0);
@@ -1159,7 +1168,7 @@ export class ParticleEngine {
         if (p.trail.length > 5) p.trail.shift();
       }
 
-      p.life -= 1;
+      p.life -= speedStep;
       return p.life > 0;
     });
 
@@ -1345,7 +1354,8 @@ export class ParticleEngine {
   // ════════════════════════════════════════════════════════════════════
 
   private updateFrost(cw: number, ch: number, sz: number) {
-    const spd = this.params.speed / 50;
+    const speedStep = this.getSpeedStep();
+    const spd = speedStep;
     const densityFactor = this.params.density / 50;
 
     // Spawn ice crystals at edge
@@ -1398,14 +1408,14 @@ export class ParticleEngine {
     }
 
     this.particles = this.particles.filter(p => {
-      p.x += p.vx;
-      p.y += p.vy;
+      p.x += p.vx * speedStep;
+      p.y += p.vy * speedStep;
       // Snowflakes sway
       if (p.rotSpeed !== undefined) {
-        p.vx += Math.sin(this.time * 2 + (p.flickerPhase ?? 0)) * 0.02;
-        p.rotAngle = (p.rotAngle ?? 0) + (p.rotSpeed ?? 0);
+        p.vx += Math.sin(this.time * 2 + (p.flickerPhase ?? 0)) * 0.02 * speedStep;
+        p.rotAngle = (p.rotAngle ?? 0) + (p.rotSpeed ?? 0) * speedStep;
       }
-      p.life -= 1;
+      p.life -= speedStep;
       return p.life > 0 && p.y < ch + 10;
     });
   }
@@ -1478,7 +1488,8 @@ export class ParticleEngine {
   // ════════════════════════════════════════════════════════════════════
 
   private updateRipple(cw: number, ch: number, sz: number) {
-    this.ripplePhase += 0.02 * (this.params.speed / 50);
+    const speedStep = this.getSpeedStep();
+    this.ripplePhase += 0.02 * speedStep;
 
     // Spawn shimmer particles at edge
     const spawnRate = Math.floor(this.params.density / 10) + 1;
@@ -1501,9 +1512,9 @@ export class ParticleEngine {
     }
 
     this.particles = this.particles.filter(p => {
-      p.x += p.vx;
-      p.y += p.vy;
-      p.life -= 1;
+      p.x += p.vx * speedStep;
+      p.y += p.vy * speedStep;
+      p.life -= speedStep;
       return p.life > 0;
     });
   }
@@ -1581,7 +1592,8 @@ export class ParticleEngine {
   // ════════════════════════════════════════════════════════════════════
 
   private updatePetal(cw: number, ch: number, _sz: number) {
-    this.petalTime += 0.016 * (this.params.speed / 50);
+    const speedStep = this.getSpeedStep();
+    this.petalTime += 0.016 * speedStep;
 
     // Spawn petals from top (gradually ramp up)
     const warmup = Math.min(1, this.petalTime / 2);
@@ -1607,12 +1619,12 @@ export class ParticleEngine {
 
     this.particles = this.particles.filter(p => {
       // Swaying motion
-      p.x += p.vx + Math.sin(this.petalTime * (p.swaySpeed ?? 1.5) + (p.swayPhase ?? 0)) * 0.8;
-      p.y += p.vy;
-      p.rotAngle = (p.rotAngle ?? 0) + (p.rotSpeed ?? 0);
-      p.vy += 0.002; // slight gravity
-      p.vy *= 0.999; // terminal velocity
-      p.life -= 1;
+      p.x += (p.vx + Math.sin(this.petalTime * (p.swaySpeed ?? 1.5) + (p.swayPhase ?? 0)) * 0.8) * speedStep;
+      p.y += p.vy * speedStep;
+      p.rotAngle = (p.rotAngle ?? 0) + (p.rotSpeed ?? 0) * speedStep;
+      p.vy += 0.002 * speedStep; // slight gravity
+      p.vy *= Math.pow(0.999, speedStep); // terminal velocity
+      p.life -= speedStep;
       return p.life > 0 && p.y < ch + 20;
     });
   }
@@ -1656,7 +1668,8 @@ export class ParticleEngine {
   // ════════════════════════════════════════════════════════════════════
 
   private updateStardust(cw: number, ch: number, sz: number) {
-    this.stardustTime += 0.016 * (this.params.speed / 50);
+    const speedStep = this.getSpeedStep();
+    this.stardustTime += 0.016 * speedStep;
     const cx = cw / 2, cy = ch / 2;
 
     // Maintain star particles around edge
@@ -1695,7 +1708,7 @@ export class ParticleEngine {
     }
 
     // Spawn meteors occasionally
-    this.meteorTimer += 1;
+    this.meteorTimer += speedStep;
     const meteorInterval = Math.max(30, 120 - this.params.density);
     if (this.meteorTimer >= meteorInterval) {
       this.meteorTimer = 0;
@@ -1717,21 +1730,21 @@ export class ParticleEngine {
 
     // Update particles with slow rotation
     this.particles = this.particles.filter(p => {
-      p.angle = (p.angle ?? 0) + (p.angularSpeed ?? 0);
+      p.angle = (p.angle ?? 0) + (p.angularSpeed ?? 0) * speedStep;
       if (this.shape === 'circle') {
         const dist = Math.sqrt((p.x - cx) ** 2 + (p.y - cy) ** 2);
-        const a2 = Math.atan2(p.y - cy, p.x - cx) + (p.angularSpeed ?? 0);
+        const a2 = Math.atan2(p.y - cy, p.x - cx) + (p.angularSpeed ?? 0) * speedStep;
         p.x = cx + Math.cos(a2) * dist;
         p.y = cy + Math.sin(a2) * dist;
       } else {
         const dx = p.x - cx;
         const dy = p.y - cy;
-        const turn = p.angularSpeed ?? 0;
+        const turn = (p.angularSpeed ?? 0) * speedStep;
         p.x += -dy * turn * 0.18;
         p.y += dx * turn * 0.18;
       }
-      p.x += p.vx;
-      p.y += p.vy;
+      p.x += p.vx * speedStep;
+      p.y += p.vy * speedStep;
       if (!this.isInsideShapePoint(p.x, p.y, cx, cy, sz / 2, -8)) {
         const projected = this.projectInsideShapePoint(p.x, p.y, cx, cy, sz / 2, -8);
         p.x = projected.x;
@@ -1739,15 +1752,15 @@ export class ParticleEngine {
         p.vx *= -0.25;
         p.vy *= -0.25;
       }
-      p.life -= 1;
+      p.life -= speedStep;
       return p.life > 0;
     });
 
     // Update meteors
     this.meteors = this.meteors.filter(m => {
-      m.x += m.vx;
-      m.y += m.vy;
-      m.life -= 1;
+      m.x += m.vx * speedStep;
+      m.y += m.vy * speedStep;
+      m.life -= speedStep;
       return m.life > 0;
     });
   }
@@ -1802,7 +1815,8 @@ export class ParticleEngine {
   // ════════════════════════════════════════════════════════════════════
 
   private updatePrism(cw: number, ch: number, sz: number) {
-    this.prismTime += 0.016 * (this.params.speed / 50);
+    const speedStep = this.getSpeedStep();
+    this.prismTime += 0.016 * speedStep;
 
     // Rainbow colors cycling
     const rainbowColors = [0xff0000, 0xff8800, 0xffff00, 0x00ff00, 0x0088ff, 0x4400ff, 0x8800ff];
@@ -1833,11 +1847,11 @@ export class ParticleEngine {
         p.trail.push({ x: p.x, y: p.y, alpha: p.alpha, size: p.size });
         if (p.trail.length > 5) p.trail.shift();
       }
-      p.x += p.vx;
-      p.y += p.vy;
-      p.vx *= 0.99;
-      p.vy *= 0.99;
-      p.life -= 1;
+      p.x += p.vx * speedStep;
+      p.y += p.vy * speedStep;
+      p.vx *= Math.pow(0.99, speedStep);
+      p.vy *= Math.pow(0.99, speedStep);
+      p.life -= speedStep;
       return p.life > 0;
     });
   }
@@ -1908,7 +1922,8 @@ export class ParticleEngine {
   // ════════════════════════════════════════════════════════════════════
 
   private updateVortex(cw: number, ch: number, sz: number) {
-    this.vortexTime += 0.016 * (this.params.speed / 50);
+    const speedStep = this.getSpeedStep();
+    this.vortexTime += 0.016 * speedStep;
     const cx = cw / 2, cy = ch / 2;
     const armCount = 3 + Math.floor(this.params.intensity / 25);
 
@@ -1940,9 +1955,9 @@ export class ParticleEngine {
 
     this.particles = this.particles.filter(p => {
       const oldX = p.x, oldY = p.y;
-      p.spiralAngle = (p.spiralAngle ?? 0) + (p.spiralSpeed ?? 0.02);
+      p.spiralAngle = (p.spiralAngle ?? 0) + (p.spiralSpeed ?? 0.02) * speedStep;
       // Spiral inward slowly
-      p.spiralRadius = (p.spiralRadius ?? 0) - 0.1;
+      p.spiralRadius = (p.spiralRadius ?? 0) - 0.1 * speedStep;
       if ((p.spiralRadius ?? 0) < sz * 0.08) {
         p.spiralRadius = sz * 0.08 + Math.random() * sz * 0.1;
       }
@@ -1955,7 +1970,7 @@ export class ParticleEngine {
         if (p.trail.length > 6) p.trail.shift();
       }
 
-      p.life -= 1;
+      p.life -= speedStep;
       return p.life > 0;
     });
   }
@@ -2027,7 +2042,8 @@ export class ParticleEngine {
   // ════════════════════════════════════════════════════════════════════
 
   private updateFirework(cw: number, ch: number, sz: number) {
-    this.fireworkTimer += this.params.speed / 50;
+    const speedStep = this.getSpeedStep();
+    this.fireworkTimer += speedStep;
 
     // Spawn new firework burst
     const burstInterval = Math.max(20, 80 - Math.floor(this.params.density / 2));
@@ -2084,16 +2100,16 @@ export class ParticleEngine {
           p.trail.push({ x: p.x, y: p.y, alpha: p.alpha, size: p.size });
           if (p.trail.length > 5) p.trail.shift();
         }
-        p.x += p.vx;
-        p.y += p.vy;
-        p.vy += 0.04; // gravity
-        p.vx *= 0.98;
-        p.vy *= 0.98;
-        p.size *= 0.995;
-        p.life -= 1;
+        p.x += p.vx * speedStep;
+        p.y += p.vy * speedStep;
+        p.vy += 0.04 * speedStep; // gravity
+        p.vx *= Math.pow(0.98, speedStep);
+        p.vy *= Math.pow(0.98, speedStep);
+        p.size *= Math.pow(0.995, speedStep);
+        p.life -= speedStep;
         return p.life > 0;
       });
-      burst.life -= 1;
+      burst.life -= speedStep;
       return burst.life > 0 && burst.particles.length > 0;
     });
   }
@@ -2134,7 +2150,8 @@ export class ParticleEngine {
   // ════════════════════════════════════════════════════════════════════
 
   private updateGold(cw: number, ch: number, _sz: number) {
-    this.goldTime += 0.016 * (this.params.speed / 50);
+    const speedStep = this.getSpeedStep();
+    this.goldTime += 0.016 * speedStep;
 
     // Spawn gold particles from top
     const spawnRate = Math.floor(this.params.density / 8) + 2;
@@ -2159,10 +2176,10 @@ export class ParticleEngine {
     }
 
     this.particles = this.particles.filter(p => {
-      p.x += p.vx + Math.sin(this.goldTime * (p.swaySpeed ?? 1) + (p.swayPhase ?? 0)) * 0.3;
-      p.y += p.vy;
-      p.vy += 0.001;
-      p.life -= 1;
+      p.x += (p.vx + Math.sin(this.goldTime * (p.swaySpeed ?? 1) + (p.swayPhase ?? 0)) * 0.3) * speedStep;
+      p.y += p.vy * speedStep;
+      p.vy += 0.001 * speedStep;
+      p.life -= speedStep;
       return p.life > 0 && p.y < ch + 10;
     });
   }
@@ -2198,7 +2215,8 @@ export class ParticleEngine {
   // ════════════════════════════════════════════════════════════════════
 
   private updateSpin(cw: number, ch: number, sz: number) {
-    this.spinTime += 0.016 * (this.params.speed / 50);
+    const speedStep = this.getSpeedStep();
+    this.spinTime += 0.016 * speedStep;
     const cx = cw / 2, cy = ch / 2;
     const ringCount = 2 + Math.floor(this.params.intensity / 30);
     const targetCount = Math.floor(this.params.density * 3) + 40;
@@ -2226,7 +2244,7 @@ export class ParticleEngine {
 
     this.particles = this.particles.filter(p => {
       const oldX = p.x, oldY = p.y;
-      p.angle = (p.angle ?? 0) + (p.angularSpeed ?? 0.02);
+      p.angle = (p.angle ?? 0) + (p.angularSpeed ?? 0.02) * speedStep;
       // Slight radius oscillation
       const wobble = Math.sin(this.spinTime * 2 + (p.orbitLayer ?? 0)) * sz * 0.02;
       p.x = cx + Math.cos(p.angle ?? 0) * ((p.radius ?? 0) + wobble);
@@ -2235,7 +2253,7 @@ export class ParticleEngine {
         p.trail.push({ x: oldX, y: oldY, alpha: p.alpha, size: p.size });
         if (p.trail.length > 8) p.trail.shift();
       }
-      p.life -= 1;
+      p.life -= speedStep;
       return p.life > 0;
     });
   }
@@ -2477,7 +2495,8 @@ export class ParticleEngine {
   // ════════════════════════════════════════════════════════════════════
 
   private updateBubble(cw: number, ch: number, sz: number) {
-    this.bubbleTime += 0.016 * (this.params.speed / 50);
+    const speedStep = this.getSpeedStep();
+    this.bubbleTime += 0.016 * speedStep;
     const cx = cw / 2, cy = ch / 2, r = sz / 2;
     const warmup = Math.min(1, this.bubbleTime / 2);
     const targetCount = Math.floor((this.params.density * 1.5 + 20) * warmup);
@@ -2502,12 +2521,12 @@ export class ParticleEngine {
 
     this.particles = this.particles.filter(p => {
       // Rise
-      p.y -= 0.5 + Math.random() * 0.3;
+      p.y -= (0.5 + Math.random() * 0.3) * speedStep;
       // Sway
-      p.x += Math.sin(this.bubbleTime * (p.swaySpeed ?? 1) + (p.swayPhase ?? 0)) * 0.5;
+      p.x += Math.sin(this.bubbleTime * (p.swaySpeed ?? 1) + (p.swayPhase ?? 0)) * 0.5 * speedStep;
       // Slight shrink as it rises
-      p.size *= 0.9995;
-      p.life -= 1;
+      p.size *= Math.pow(0.9995, speedStep);
+      p.life -= speedStep;
       if (!this.isInsideShapePoint(p.x, p.y, cx, cy, r, -p.size)) {
         p.life = 0;
       }
@@ -2538,7 +2557,8 @@ export class ParticleEngine {
   // ════════════════════════════════════════════════════════════════════
 
   private updateAurora(cw: number, ch: number, sz: number) {
-    this.auroraTime += 0.016 * (this.params.speed / 50);
+    const speedStep = this.getSpeedStep();
+    this.auroraTime += 0.016 * speedStep;
     const cx = cw / 2;
     const cy = ch / 2;
     const r = sz / 2;
@@ -2567,13 +2587,13 @@ export class ParticleEngine {
     this.particles = this.particles.filter(p => {
       const wave = Math.sin(this.auroraTime * (p.swaySpeed ?? 0.4) + (p.swayPhase ?? 0));
       const drift = Math.sin(this.auroraTime * 0.22 + (p.swayPhase ?? 0) * 0.7);
-      p.x += wave * 0.85 + drift * 0.45;
-      p.y += Math.sin(this.auroraTime * 0.18 + (p.swayPhase ?? 0)) * 0.12;
+      p.x += (wave * 0.85 + drift * 0.45) * speedStep;
+      p.y += Math.sin(this.auroraTime * 0.18 + (p.swayPhase ?? 0)) * 0.12 * speedStep;
       p.alpha = (
         0.035
         + 0.05 * (0.5 + 0.5 * Math.sin(this.auroraTime * 1.3 + (p.swayPhase ?? 0)))
       ) * (p.life / (p.maxLife ?? 800));
-      p.life -= 1;
+      p.life -= speedStep;
       return p.life > 0;
     });
   }
@@ -2629,7 +2649,8 @@ export class ParticleEngine {
   // ════════════════════════════════════════════════════════════════════
 
   private updateFirefly(cw: number, ch: number, sz: number) {
-    this.fireflyTime += 0.016 * (this.params.speed / 50);
+    const speedStep = this.getSpeedStep();
+    this.fireflyTime += 0.016 * speedStep;
     const cx = cw / 2, cy = ch / 2, r = sz / 2;
     const targetCount = Math.floor(this.params.density * 0.8) + 15;
 
@@ -2653,12 +2674,12 @@ export class ParticleEngine {
     }
 
     this.particles = this.particles.filter(p => {
-      p.vx += (Math.random() - 0.5) * 0.05;
-      p.vy += (Math.random() - 0.5) * 0.05;
-      p.vx *= 0.98;
-      p.vy *= 0.98;
-      p.x += p.vx + Math.sin(this.fireflyTime * (p.swaySpeed ?? 1) + (p.swayPhase ?? 0)) * 0.2;
-      p.y += p.vy + Math.cos(this.fireflyTime * (p.swaySpeed ?? 1) + (p.swayPhase ?? 0)) * 0.15;
+      p.vx += (Math.random() - 0.5) * 0.05 * speedStep;
+      p.vy += (Math.random() - 0.5) * 0.05 * speedStep;
+      p.vx *= Math.pow(0.98, speedStep);
+      p.vy *= Math.pow(0.98, speedStep);
+      p.x += (p.vx + Math.sin(this.fireflyTime * (p.swaySpeed ?? 1) + (p.swayPhase ?? 0)) * 0.2) * speedStep;
+      p.y += (p.vy + Math.cos(this.fireflyTime * (p.swaySpeed ?? 1) + (p.swayPhase ?? 0)) * 0.15) * speedStep;
 
       if (!this.isInsideShapePoint(p.x, p.y, cx, cy, r, r * 0.08)) {
         const projected = this.projectInsideShapePoint(p.x, p.y, cx, cy, r, r * 0.08);
@@ -2674,7 +2695,7 @@ export class ParticleEngine {
       const fadeOut = lifeRatio < 0.1 ? lifeRatio / 0.1 : 1;
       p.alpha = flicker * fadeIn * fadeOut;
 
-      p.life -= 1;
+      p.life -= speedStep;
       return p.life > 0;
     });
   }
@@ -2694,7 +2715,8 @@ export class ParticleEngine {
   // ════════════════════════════════════════════════════════════════════
 
   private updateRain(cw: number, ch: number, sz: number) {
-    this.rainTime += 0.016 * (this.params.speed / 50);
+    const speedStep = this.getSpeedStep();
+    this.rainTime += 0.016 * speedStep;
     const cx = cw / 2, cy = ch / 2, r = sz / 2;
     const targetCount = Math.floor(this.params.density * 2) + 40;
 
@@ -2727,9 +2749,9 @@ export class ParticleEngine {
         p.trail.push({ x: p.x, y: p.y, alpha: p.alpha, size: p.size });
         if (p.trail.length > 4) p.trail.shift();
       }
-      p.x += p.vx;
-      p.y += p.vy;
-      p.vy += 0.05;
+      p.x += p.vx * speedStep;
+      p.y += p.vy * speedStep;
+      p.vy += 0.05 * speedStep;
 
       if (this.shape === 'circle') {
         const dx = p.x - cx, dy = p.y - cy;
@@ -2742,7 +2764,7 @@ export class ParticleEngine {
         p.life = 0;
       }
 
-      p.life -= 1;
+      p.life -= speedStep;
       return p.life > 0 && p.y < ch + 10;
     });
   }
