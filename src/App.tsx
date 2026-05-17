@@ -144,7 +144,7 @@ type ExportDrivenCanvas = HTMLCanvasElement & {
   __avatarExtractFrame?: () => HTMLCanvasElement | null;
 };
 
-type WorkspaceTab = 'controls' | 'output';
+type WorkspaceTab = 'effects' | 'controls' | 'output';
 
 function App() {
   const [image, setImage] = useState<HTMLImageElement | null>(null);
@@ -159,7 +159,6 @@ function App() {
   );
   const [workspaceTab, setWorkspaceTab] = useState<WorkspaceTab>('controls');
   const [previewDragging, setPreviewDragging] = useState(false);
-  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -691,26 +690,8 @@ function App() {
             </div>
           </section>
 
-          <button
-            type="button"
-            className={`mobile-sidebar-scrim ${mobileSidebarOpen ? 'open' : ''}`}
-            aria-label="关闭特效侧边栏"
-            onClick={() => setMobileSidebarOpen(false)}
-          />
-          <button
-            type="button"
-            className={`mobile-sidebar-toggle ${mobileSidebarOpen ? 'open' : ''}`}
-            aria-controls="mobile-effects-sidebar"
-            aria-expanded={mobileSidebarOpen}
-            onClick={() => setMobileSidebarOpen((open) => !open)}
-          >
-            <span className="mobile-sidebar-toggle-icon">{mobileSidebarOpen ? '×' : '☰'}</span>
-            <span className="mobile-sidebar-toggle-text">{mobileSidebarOpen ? '收起' : '特效'}</span>
-          </button>
-
           <aside
-            id="mobile-effects-sidebar"
-            className={`side-rail ${mobileSidebarOpen ? 'mobile-open' : ''}`}
+            className="side-rail"
           >
             <section className="panel selector-shell side-panel">
               <div className="section-head">
@@ -729,10 +710,17 @@ function App() {
             <section className="panel workspace-panel side-panel">
               <div className="section-head">
                 <div>
-                  <h2 className="section-title">调节与导出</h2>
+                  <h2 className="section-title">调节、特效与导出</h2>
                 </div>
               </div>
               <div className="workspace-tabs">
+                <button
+                  type="button"
+                  className={`workspace-tab workspace-tab-mobile-only ${workspaceTab === 'effects' ? 'active' : ''}`}
+                  onClick={() => setWorkspaceTab('effects')}
+                >
+                  特效
+                </button>
                 <button
                   type="button"
                   className={`workspace-tab ${workspaceTab === 'controls' ? 'active' : ''}`}
@@ -749,12 +737,26 @@ function App() {
                 </button>
               </div>
 
-              {workspaceTab === 'controls' ? (
+              {workspaceTab === 'effects' ? (
+                <div className="workspace-body workspace-body-effects">
+                  <div className="workspace-section-head">
+                    <div className="group-label">特效</div>
+                    <span className="selector-current">当前：{EFFECT_LABELS[effect]}</span>
+                  </div>
+                  <EffectSelector selected={effect} onChange={handleEffectChange} />
+                </div>
+              ) : workspaceTab === 'controls' ? (
                 <div className="workspace-body">
+                  <div className="workspace-section-head">
+                    <div className="group-label">参数调节</div>
+                  </div>
                   <EffectControls effect={effect} params={params} onChange={setParams} />
                 </div>
               ) : (
                 <div className="workspace-body">
+                  <div className="workspace-section-head">
+                    <div className="group-label">导出设置</div>
+                  </div>
                   <div className="output-group">
                     <div className="group-label">镜像</div>
                     <div className="mirror-selector">
