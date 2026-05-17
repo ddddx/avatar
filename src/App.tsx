@@ -147,6 +147,7 @@ function App() {
   );
   const [workspaceTab, setWorkspaceTab] = useState<WorkspaceTab>('controls');
   const [previewDragging, setPreviewDragging] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -676,7 +677,27 @@ function App() {
             </div>
           </section>
 
-          <aside className="side-rail">
+          <button
+            type="button"
+            className={`mobile-sidebar-scrim ${mobileSidebarOpen ? 'open' : ''}`}
+            aria-label="关闭特效侧边栏"
+            onClick={() => setMobileSidebarOpen(false)}
+          />
+          <button
+            type="button"
+            className={`mobile-sidebar-toggle ${mobileSidebarOpen ? 'open' : ''}`}
+            aria-controls="mobile-effects-sidebar"
+            aria-expanded={mobileSidebarOpen}
+            onClick={() => setMobileSidebarOpen((open) => !open)}
+          >
+            <span className="mobile-sidebar-toggle-icon">{mobileSidebarOpen ? '×' : '☰'}</span>
+            <span className="mobile-sidebar-toggle-text">{mobileSidebarOpen ? '收起' : '特效'}</span>
+          </button>
+
+          <aside
+            id="mobile-effects-sidebar"
+            className={`side-rail ${mobileSidebarOpen ? 'mobile-open' : ''}`}
+          >
             <section className="panel selector-shell side-panel">
               <div className="section-head">
                 <div className="selector-head-main">
