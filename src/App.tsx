@@ -11,7 +11,7 @@ import {
   RING_LOOP_FRAME_DELAY_MS,
 } from './effects/types';
 import type { EffectType, CropShape, EffectParams, MirrorSettings } from './effects/types';
-import { createRingRenderer } from './effects/ring-renderer';
+import { createRingRenderer, getRingAnimationProgress } from './effects/ring-renderer';
 // @ts-ignore - gif.js browser bundle has no types
 import GIF from 'gif.js/dist/gif.js';
 // @ts-ignore - upng-js has no types
@@ -24,7 +24,8 @@ import './App.css';
 const supportsMediaRecorder = typeof MediaRecorder !== 'undefined';
 const supportsWebWorkers = typeof Worker !== 'undefined';
 const GIF_TRANSPARENT_KEY = 0xff00ff;
-const RING_EFFECTS = new Set<EffectType>(['solidring', 'disc', 'googleone', 'duotone', 'blinkring', 'linxudo']);
+const RING_EFFECTS = new Set<EffectType>(['solidring', 'disc', 'googleone', 'duotone', 'blinkring', 'linxudo', 'bounce']);
+const TRANSPARENT_STAGE_EFFECTS = new Set<EffectType>(['bounce']);
 const EFFECT_LABELS: Record<EffectType, string> = {
   solidring: '实心环',
   disc: '光盘',
@@ -32,6 +33,7 @@ const EFFECT_LABELS: Record<EffectType, string> = {
   duotone: '双色环',
   blinkring: '闪烁环',
   linxudo: 'LinxuDo',
+  bounce: '弹跳头像',
   lightning: '闪电',
   fire: '火焰',
   glow: '炫光',
@@ -77,6 +79,15 @@ function snapTransparentToGifKey(imageData: ImageData) {
   }
 }
 
+function hasTransparentStage(
+  effect: EffectType,
+  shape: CropShape,
+  image: HTMLImageElement | null,
+  gifData: GifData | null,
+) {
+  return (!image && !gifData) || shape === 'circle' || TRANSPARENT_STAGE_EFFECTS.has(effect);
+}
+
 
 type OfflineRingRendererOptions = {
   width: number;
@@ -118,8 +129,9 @@ function createOfflineRingRenderer({
 
   return {
     frameCanvas,
-    renderFrame(progress: number, elapsedMs: number) {
-      renderer.render(ctx, params, progress, elapsedMs);
+    renderFrame(_progress: number, elapsedMs: number) {
+      const animationProgress = getRingAnimationProgress(params.speed, elapsedMs);
+      renderer.render(ctx, params, animationProgress, elapsedMs);
       return frameCanvas;
     }
   }
@@ -276,6 +288,7 @@ function App() {
   const exportGIF = useCallback(async (canvas: HTMLCanvasElement) => {
     const duration = 2000;
     const fps = 15; // Lower fps for smaller GIF
+    const transparentStage = hasTransparentStage(effect, shape, image, gifData);
 
     // Check Web Worker support
     if (!supportsWebWorkers) {
@@ -288,7 +301,7 @@ function App() {
       width: canvas.width,
       height: canvas.height,
       workerScript: import.meta.env.BASE_URL + 'gif.worker.js',
-      transparent: (!image && !gifData) || shape === 'circle' ? GIF_TRANSPARENT_KEY : undefined,
+      transparent: transparentStage ? GIF_TRANSPARENT_KEY : undefined,
     });
 
     const frameCount = RING_EFFECTS.has(effect) ? RING_LOOP_FRAME_COUNT : Math.floor((duration / 1000) * fps);
@@ -313,7 +326,7 @@ function App() {
     // Then snap near-black pixels to magenta (the gif.js transparent color key).
     let offscreen: HTMLCanvasElement | null = null;
     let offCtx: CanvasRenderingContext2D | null = null;
-    if (!image && !gifData || shape === 'circle') {
+    if (transparentStage) {
       offscreen = document.createElement('canvas');
       offscreen.width = canvas.width;
       offscreen.height = canvas.height;
@@ -356,7 +369,7 @@ function App() {
               }
               px[j + 3] = 255;
             }
-          } else if (shape === 'circle') {
+          } else if (transparentStage) {
             snapTransparentToGifKey(imgData);
           }
           offCtx.putImageData(imgData, 0, 0);
@@ -473,6 +486,7 @@ function App() {
   const exportWebP = useCallback(async (canvas: HTMLCanvasElement) => {
     const duration = 2000;
     const fps = 12;
+    const transparentStage = hasTransparentStage(effect, shape, image, gifData);
     const frameCount = RING_EFFECTS.has(effect) ? RING_LOOP_FRAME_COUNT : Math.floor((duration / 1000) * fps);
     const frameDelay = RING_EFFECTS.has(effect) ? RING_LOOP_FRAME_DELAY_MS : Math.round(1000 / fps);
     const w = canvas.width;
@@ -530,7 +544,7 @@ function App() {
     }
 
     setExportProgress(0.8);
-    const webpData = await encodeAnimation(w, h, !image && !gifData, frames);
+    const webpData = await encodeAnimation(w, h, transparentStage, frames);
     if (!webpData) throw new Error('WebP animation encoding failed');
     setExportProgress(1);
     const blob = new Blob([webpData.buffer as ArrayBuffer], { type: 'image/webp' });
@@ -576,7 +590,7 @@ function App() {
           </div>
         </div>
         <div className="header-badges">
-          <span className="meta-pill">27 种特效</span>
+          <span className="meta-pill">28 种特效</span>
           <span className="meta-pill">圆外透明导出</span>
           <span className="meta-pill">GIF / APNG / WebP / WebM</span>
         </div>

@@ -22,6 +22,7 @@ const effectsByCategory: Record<EffectCategory, { type: EffectType; icon: string
     { type: 'duotone',   icon: '🔵', label: '双色环' },
     { type: 'blinkring', icon: '💠', label: '闪烁环' },
     { type: 'linxudo',   icon: '⚫', label: 'LinxuDo' },
+    { type: 'bounce',    icon: '🏀', label: '弹跳头像' },
     { type: 'orbit',     icon: '💫', label: '环形粒子' },
     { type: 'spin',      icon: '🔄', label: '旋转' },
     { type: 'loader',    icon: '⏳', label: '加载中' },

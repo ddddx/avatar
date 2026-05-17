@@ -6,7 +6,7 @@ import {
 import type { CropShape, EffectParams, EffectType, MirrorSettings } from './types';
 import type { GifData } from '../lib/gif-decoder';
 
-const RING_EFFECTS = new Set<EffectType>(['solidring', 'disc', 'googleone', 'duotone', 'blinkring', 'linxudo']);
+const RING_EFFECTS = new Set<EffectType>(['solidring', 'disc', 'googleone', 'duotone', 'blinkring', 'linxudo', 'bounce']);
 const SOLID_RING_COLORS = ['#ff0040', '#ff8000', '#00ff80', '#00b0ff', '#ff0040'];
 const DISC_COLORS = ['#ff0040', '#ff8000', '#ffe000', '#00ff80', '#00b0ff', '#a040ff', '#ff0040'];
 const GOOGLE_ONE_SEGMENTS = [
@@ -276,6 +276,81 @@ function drawCoveredSource(
   ctx.restore();
 }
 
+function getBounceAxisPosition(progress: number) {
+  const wrapped = wrapUnit(progress);
+  return wrapped < 0.5 ? wrapped * 2 : (1 - wrapped) * 2;
+}
+
+function getBounceCenter(
+  shape: CropShape,
+  width: number,
+  height: number,
+  progress: number,
+  avatarRadius: number,
+) {
+  const xUnit = getBounceAxisPosition(progress + 0.125);
+  const yUnit = getBounceAxisPosition(progress * 2 + 0.375);
+
+  if (shape === 'square') {
+    const minX = avatarRadius;
+    const maxX = width - avatarRadius;
+    const minY = avatarRadius;
+    const maxY = height - avatarRadius;
+    return {
+      x: minX + (maxX - minX) * xUnit,
+      y: minY + (maxY - minY) * yUnit,
+    };
+  }
+
+  const cx = width / 2;
+  const cy = height / 2;
+  const travelRadius = Math.max(Math.min(width, height) / 2 - avatarRadius, 0);
+  let offsetX = (xUnit * 2 - 1) * travelRadius;
+  let offsetY = (yUnit * 2 - 1) * travelRadius;
+  const offsetLength = Math.hypot(offsetX, offsetY);
+
+  if (offsetLength > travelRadius && offsetLength > 0) {
+    const clampScale = travelRadius / offsetLength;
+    offsetX *= clampScale;
+    offsetY *= clampScale;
+  }
+
+  return {
+    x: cx + offsetX,
+    y: cy + offsetY,
+  };
+}
+
+function drawBounceAvatar(
+  ctx: CanvasRenderingContext2D,
+  source: CanvasImageSource,
+  sourceWidth: number,
+  sourceHeight: number,
+  mirror: MirrorSettings,
+  shape: CropShape,
+  width: number,
+  height: number,
+  progress: number,
+) {
+  const avatarDiameter = Math.min(width, height) * 0.6;
+  const avatarRadius = avatarDiameter / 2;
+  const center = getBounceCenter(shape, width, height, progress, avatarRadius);
+
+  ctx.save();
+  clipShapePath(ctx, shape, width, height);
+  ctx.clip();
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(center.x, center.y, avatarRadius, 0, Math.PI * 2);
+  ctx.closePath();
+  ctx.clip();
+  ctx.translate(center.x - avatarRadius, center.y - avatarRadius);
+  drawCoveredSource(ctx, source, sourceWidth, sourceHeight, mirror, avatarDiameter, avatarDiameter);
+  ctx.restore();
+  ctx.restore();
+}
+
 type RingRendererOptions = {
   width: number;
   height: number;
@@ -308,6 +383,21 @@ export function createRingRenderer({
   return {
     render(ctx: CanvasRenderingContext2D, params: EffectParams, progress: number, elapsedMs: number) {
       ctx.clearRect(0, 0, width, height);
+
+      if (effect === 'bounce') {
+        if (!hasSource) {
+          return;
+        }
+        if (gifSource && gifFrameCanvas && gifFrameCtx) {
+          const frame = gifSource.frames[getGifFrameIndexAtTime(gifSource, elapsedMs)];
+          gifFrameCtx.clearRect(0, 0, gifFrameCanvas.width, gifFrameCanvas.height);
+          gifFrameCtx.putImageData(frame.imageData, 0, 0);
+          drawBounceAvatar(ctx, gifFrameCanvas, gifSource.width, gifSource.height, mirror, shape, width, height, progress);
+        } else if (image) {
+          drawBounceAvatar(ctx, image, image.width, image.height, mirror, shape, width, height, progress);
+        }
+        return;
+      }
 
       if (hasSource) {
         ctx.save();
