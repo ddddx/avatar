@@ -24,6 +24,8 @@ const INTENSITY_EFFECTS = new Set<EffectType>([
   'vortex', 'firework', 'gold', 'spin', 'loader', 'spinner', 'matrix', 'bubble', 'aurora', 'firefly',
   'rain', 'solidring', 'disc', 'googleone', 'duotone', 'blinkring',
 ]);
+const SIZE_EFFECTS = new Set<EffectType>(['bounce']);
+const COUNT_EFFECTS = new Set<EffectType>(['bounce']);
 
 const EffectControls: React.FC<Props> = ({ effect, params, onChange }) => {
   const set = (key: keyof EffectParams, val: number | string) => {
@@ -60,6 +62,26 @@ const EffectControls: React.FC<Props> = ({ effect, params, onChange }) => {
         />
         <span className="val">{params.speed}</span>
       </div>
+      {SIZE_EFFECTS.has(effect) && (
+        <div className="control-row">
+          <label>头像尺寸</label>
+          <input
+            type="range" min={1} max={100} value={params.size}
+            onChange={(e) => set('size', +e.target.value)}
+          />
+          <span className="val">{params.size}%</span>
+        </div>
+      )}
+      {COUNT_EFFECTS.has(effect) && (
+        <div className="control-row">
+          <label>球数量</label>
+          <input
+            type="range" min={1} max={12} value={params.count}
+            onChange={(e) => set('count', +e.target.value)}
+          />
+          <span className="val">{params.count}</span>
+        </div>
+      )}
       {COLOR_EFFECTS.has(effect) && (
         <div className="control-row colors">
           <label>主色</label>

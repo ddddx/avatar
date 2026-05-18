@@ -281,15 +281,74 @@ function getBounceAxisPosition(progress: number) {
   return wrapped < 0.5 ? wrapped * 2 : (1 - wrapped) * 2;
 }
 
+type BounceTrajectoryFamily = 'pingpong' | 'orbit' | 'figure8';
+
+type BounceTrajectoryPreset = {
+  family: BounceTrajectoryFamily;
+  xTurns: number;
+  yTurns: number;
+  xPhase: number;
+  yPhase: number;
+  xAmplitude: number;
+  yAmplitude: number;
+  mirrorX?: boolean;
+  mirrorY?: boolean;
+};
+
+const BOUNCE_TRAJECTORIES: readonly BounceTrajectoryPreset[] = [
+  { family: 'pingpong', xTurns: 1, yTurns: 2, xPhase: 0.125, yPhase: 0.375, xAmplitude: 1, yAmplitude: 1 },
+  { family: 'pingpong', xTurns: 2, yTurns: 1, xPhase: 0.625, yPhase: 0.125, xAmplitude: 0.92, yAmplitude: 0.86, mirrorX: true },
+  { family: 'orbit', xTurns: 1, yTurns: 1, xPhase: 0.25, yPhase: 0.0, xAmplitude: 0.82, yAmplitude: 0.82 },
+  { family: 'figure8', xTurns: 1, yTurns: 2, xPhase: 0.0, yPhase: 0.125, xAmplitude: 0.94, yAmplitude: 0.66 },
+  { family: 'orbit', xTurns: 2, yTurns: 3, xPhase: 0.125, yPhase: 0.375, xAmplitude: 0.76, yAmplitude: 0.64, mirrorY: true },
+  { family: 'pingpong', xTurns: 3, yTurns: 2, xPhase: 0.375, yPhase: 0.625, xAmplitude: 0.84, yAmplitude: 1, mirrorY: true },
+] as const;
+
+function getSignedBounceAxis(progress: number) {
+  return getBounceAxisPosition(progress) * 2 - 1;
+}
+
+function getBounceTrajectoryPoint(progress: number, index: number, count: number) {
+  const spread = count <= 1 ? 0 : index / count;
+  const preset = BOUNCE_TRAJECTORIES[index % BOUNCE_TRAJECTORIES.length];
+  const variantCycle = Math.floor(index / BOUNCE_TRAJECTORIES.length);
+  const xTurns = preset.xTurns + (variantCycle % 2);
+  const yTurns = preset.yTurns + ((variantCycle + 1) % 2);
+  const xPhase = preset.xPhase + spread * 0.5 + variantCycle * 0.125;
+  const yPhase = preset.yPhase + spread * 0.75 + variantCycle * 0.25;
+
+  let x = 0;
+  let y = 0;
+
+  if (preset.family === 'pingpong') {
+    x = getSignedBounceAxis(progress * xTurns + xPhase) * preset.xAmplitude;
+    y = getSignedBounceAxis(progress * yTurns + yPhase) * preset.yAmplitude;
+  } else if (preset.family === 'orbit') {
+    x = Math.cos((progress * xTurns + xPhase) * Math.PI * 2) * preset.xAmplitude;
+    y = Math.sin((progress * yTurns + yPhase) * Math.PI * 2) * preset.yAmplitude;
+  } else {
+    x = Math.sin((progress * xTurns + xPhase) * Math.PI * 2) * preset.xAmplitude;
+    y = Math.sin((progress * yTurns + yPhase) * Math.PI * 2) * preset.yAmplitude;
+  }
+
+  if (preset.mirrorX) x *= -1;
+  if (preset.mirrorY) y *= -1;
+
+  return { x, y };
+}
+
 function getBounceCenter(
   shape: CropShape,
   width: number,
   height: number,
   progress: number,
   avatarRadius: number,
+  index: number,
+  count: number,
 ) {
-  const xUnit = getBounceAxisPosition(progress + 0.125);
-  const yUnit = getBounceAxisPosition(progress * 2 + 0.375);
+  const point = getBounceTrajectoryPoint(progress, index, count);
+  const xUnit = (point.x + 1) / 2;
+  const yUnit = (point.y + 1) / 2;
 
   if (shape === 'square') {
     const minX = avatarRadius;
@@ -305,8 +364,8 @@ function getBounceCenter(
   const cx = width / 2;
   const cy = height / 2;
   const travelRadius = Math.max(Math.min(width, height) / 2 - avatarRadius, 0);
-  let offsetX = (xUnit * 2 - 1) * travelRadius;
-  let offsetY = (yUnit * 2 - 1) * travelRadius;
+  let offsetX = point.x * travelRadius;
+  let offsetY = point.y * travelRadius;
   const offsetLength = Math.hypot(offsetX, offsetY);
 
   if (offsetLength > travelRadius && offsetLength > 0) {
@@ -326,28 +385,34 @@ function drawBounceAvatar(
   source: CanvasImageSource,
   sourceWidth: number,
   sourceHeight: number,
+  params: EffectParams,
   mirror: MirrorSettings,
   shape: CropShape,
   width: number,
   height: number,
   progress: number,
 ) {
-  const avatarDiameter = Math.min(width, height) * 0.6;
+  const clampedSize = Math.max(1, Math.min(params.size, 100));
+  const count = Math.max(1, Math.min(Math.round(params.count), 12));
+  const densityScale = count > 1 ? Math.max(0.34, 1 - (count - 1) * 0.08) : 1;
+  const avatarDiameter = Math.min(width, height) * (clampedSize / 100) * densityScale;
   const avatarRadius = avatarDiameter / 2;
-  const center = getBounceCenter(shape, width, height, progress, avatarRadius);
 
   ctx.save();
   clipShapePath(ctx, shape, width, height);
   ctx.clip();
 
-  ctx.save();
-  ctx.beginPath();
-  ctx.arc(center.x, center.y, avatarRadius, 0, Math.PI * 2);
-  ctx.closePath();
-  ctx.clip();
-  ctx.translate(center.x - avatarRadius, center.y - avatarRadius);
-  drawCoveredSource(ctx, source, sourceWidth, sourceHeight, mirror, avatarDiameter, avatarDiameter);
-  ctx.restore();
+  for (let index = 0; index < count; index++) {
+    const center = getBounceCenter(shape, width, height, progress, avatarRadius, index, count);
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(center.x, center.y, avatarRadius, 0, Math.PI * 2);
+    ctx.closePath();
+    ctx.clip();
+    ctx.translate(center.x - avatarRadius, center.y - avatarRadius);
+    drawCoveredSource(ctx, source, sourceWidth, sourceHeight, mirror, avatarDiameter, avatarDiameter);
+    ctx.restore();
+  }
   ctx.restore();
 }
 
@@ -392,9 +457,9 @@ export function createRingRenderer({
           const frame = gifSource.frames[getGifFrameIndexAtTime(gifSource, elapsedMs)];
           gifFrameCtx.clearRect(0, 0, gifFrameCanvas.width, gifFrameCanvas.height);
           gifFrameCtx.putImageData(frame.imageData, 0, 0);
-          drawBounceAvatar(ctx, gifFrameCanvas, gifSource.width, gifSource.height, mirror, shape, width, height, progress);
+          drawBounceAvatar(ctx, gifFrameCanvas, gifSource.width, gifSource.height, params, mirror, shape, width, height, progress);
         } else if (image) {
-          drawBounceAvatar(ctx, image, image.width, image.height, mirror, shape, width, height, progress);
+          drawBounceAvatar(ctx, image, image.width, image.height, params, mirror, shape, width, height, progress);
         }
         return;
       }

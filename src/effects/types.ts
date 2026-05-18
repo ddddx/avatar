@@ -70,6 +70,8 @@ export interface EffectParams {
   density: number;       // 1-100
   intensity: number;     // 1-100
   speed: number;         // 1-100
+  size: number;          // 1-100
+  count: number;         // 1-12
   color: string;         // hex color
   secondaryColor: string;
   ringAnimationMode: RingAnimationMode;
@@ -94,6 +96,8 @@ export const DEFAULT_PARAMS: EffectParams = {
   density: 50,
   intensity: 50,
   speed: 50,
+  size: 60,
+  count: 1,
   color: '#00d4ff',
   secondaryColor: '#ff6b35',
   ringAnimationMode: 'rotate',
@@ -128,5 +132,5 @@ export const EFFECT_PRESETS: Record<EffectType, Partial<EffectParams>> = {
   duotone:   { color: '#00d4ff', secondaryColor: '#ff6b35', density: 50, intensity: 58, speed: 50, ringAnimationMode: 'rotate', direction: 'forward' },
   blinkring: { color: '#00d4ff', secondaryColor: '#ff6b35', density: 50, intensity: 58, speed: 50, ringAnimationMode: 'rotate', direction: 'forward' },
   linxudo:   { color: '#000000', secondaryColor: '#ffffff', density: 50, intensity: 50, speed: 50, ringAnimationMode: 'rotate', direction: 'forward' },
-  bounce:    { color: '#00d4ff', secondaryColor: '#ff6b35', density: 50, intensity: 50, speed: 50, ringAnimationMode: 'rotate', direction: 'forward' },
+  bounce:    { color: '#00d4ff', secondaryColor: '#ff6b35', density: 50, intensity: 50, speed: 50, size: 60, count: 1, ringAnimationMode: 'rotate', direction: 'forward' },
 };
