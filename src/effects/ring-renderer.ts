@@ -6,9 +6,10 @@ import {
 import type { CropShape, EffectParams, EffectType, MirrorSettings } from './types';
 import type { GifData } from '../lib/gif-decoder';
 
-const RING_EFFECTS = new Set<EffectType>(['solidring', 'disc', 'googleone', 'duotone', 'blinkring', 'linxudo', 'bounce']);
+const RING_EFFECTS = new Set<EffectType>(['solidring', 'disc', 'googleone', 'duotone', 'blinkring', 'linxudo', 'bounce', 'collapsequad']);
 const SOLID_RING_COLORS = ['#ff0040', '#ff8000', '#00ff80', '#00b0ff', '#ff0040'];
 const DISC_COLORS = ['#ff0040', '#ff8000', '#ffe000', '#00ff80', '#00b0ff', '#a040ff', '#ff0040'];
+const COLLAPSE_QUAD_COLORS = ['#EA4335', '#4285F4', '#34A853', '#FBBC05'] as const;
 const GOOGLE_ONE_SEGMENTS = [
   { color: '#EA4335', degrees: 105 },
   { color: '#4285F4', degrees: 105 },
@@ -186,6 +187,57 @@ function drawLinxuDo(
   ctx.fillRect(-radius, -radius + bandHeight, diameter, bandHeight);
   ctx.fillStyle = '#D4AF37';
   ctx.fillRect(-radius, -radius + bandHeight * 2, diameter, bandHeight);
+  ctx.restore();
+}
+
+function drawCollapseQuadRing(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  params: EffectParams,
+  animation: RingAnimationState,
+  progress: number,
+) {
+  const radius = Math.min(width, height) / 2;
+  const ringWidthBase = 8 + (Math.max(1, Math.min(params.ringWidth, 100)) / 100) * 52;
+  const ringWidth = ringWidthBase * animation.widthScale;
+  const arcRadius = radius - ringWidth / 2;
+  const collapse = 0.5 - 0.5 * Math.cos(wrapUnit(progress) * Math.PI * 2);
+  const segmentRatio = 1 - collapse;
+  const baseSegmentSpan = (Math.PI * 2) / 4;
+  const baseAngle = -Math.PI / 2 + animation.phase * Math.PI * 2;
+  const capRadius = ringWidth / 2;
+  const pointOnlyThreshold = 0.035;
+
+  ctx.save();
+  ctx.lineWidth = ringWidth;
+  ctx.lineCap = 'round';
+  ctx.globalAlpha = animation.alpha;
+
+  for (let index = 0; index < COLLAPSE_QUAD_COLORS.length; index++) {
+    const color = COLLAPSE_QUAD_COLORS[index];
+    const segmentCenter = baseAngle + index * baseSegmentSpan + baseSegmentSpan / 2;
+    const pointX = width / 2 + Math.cos(segmentCenter) * arcRadius;
+    const pointY = height / 2 + Math.sin(segmentCenter) * arcRadius;
+
+    if (segmentRatio <= pointOnlyThreshold) {
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(pointX, pointY, capRadius, 0, Math.PI * 2);
+      ctx.fill();
+      continue;
+    }
+
+    const currentSpan = baseSegmentSpan * segmentRatio;
+    const startAngle = segmentCenter - currentSpan / 2;
+    const endAngle = segmentCenter + currentSpan / 2;
+
+    ctx.strokeStyle = color;
+    ctx.beginPath();
+    ctx.arc(width / 2, height / 2, arcRadius, startAngle, endAngle);
+    ctx.stroke();
+  }
+
   ctx.restore();
 }
 
@@ -484,6 +536,11 @@ export function createRingRenderer({
       const animation = getRingAnimationState(params, progress);
       if (effect === 'linxudo') {
         drawLinxuDo(ctx, width, height, animation);
+        return;
+      }
+
+      if (effect === 'collapsequad') {
+        drawCollapseQuadRing(ctx, width, height, params, animation, progress);
         return;
       }
 

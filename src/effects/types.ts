@@ -1,6 +1,6 @@
 import type { Application, Container, Graphics } from 'pixi.js';
 
-export type EffectType = 'lightning' | 'fire' | 'glow' | 'orbit' | 'shield' | 'frost' | 'ripple' | 'petal' | 'stardust' | 'prism' | 'vortex' | 'firework' | 'gold' | 'spin' | 'loader' | 'spinner' | 'matrix' | 'bubble' | 'aurora' | 'firefly' | 'rain' | 'solidring' | 'disc' | 'googleone' | 'duotone' | 'blinkring' | 'linxudo' | 'bounce';
+export type EffectType = 'lightning' | 'fire' | 'glow' | 'orbit' | 'shield' | 'frost' | 'ripple' | 'petal' | 'stardust' | 'prism' | 'vortex' | 'firework' | 'gold' | 'spin' | 'loader' | 'spinner' | 'matrix' | 'bubble' | 'aurora' | 'firefly' | 'rain' | 'solidring' | 'disc' | 'googleone' | 'duotone' | 'blinkring' | 'linxudo' | 'bounce' | 'collapsequad';
 export type CropShape = 'circle' | 'square';
 export type RotationDirection = 'forward' | 'reverse';
 export type RingAnimationMode = 'rotate' | 'breathe';
@@ -72,6 +72,7 @@ export interface EffectParams {
   speed: number;         // 1-100
   size: number;          // 1-100
   count: number;         // 1-12
+  ringWidth: number;     // 1-100
   color: string;         // hex color
   secondaryColor: string;
   ringAnimationMode: RingAnimationMode;
@@ -98,6 +99,7 @@ export const DEFAULT_PARAMS: EffectParams = {
   speed: 50,
   size: 60,
   count: 1,
+  ringWidth: 58,
   color: '#00d4ff',
   secondaryColor: '#ff6b35',
   ringAnimationMode: 'rotate',
@@ -133,4 +135,5 @@ export const EFFECT_PRESETS: Record<EffectType, Partial<EffectParams>> = {
   blinkring: { color: '#00d4ff', secondaryColor: '#ff6b35', density: 50, intensity: 58, speed: 50, ringAnimationMode: 'rotate', direction: 'forward' },
   linxudo:   { color: '#000000', secondaryColor: '#ffffff', density: 50, intensity: 50, speed: 50, ringAnimationMode: 'rotate', direction: 'forward' },
   bounce:    { color: '#00d4ff', secondaryColor: '#ff6b35', density: 50, intensity: 50, speed: 50, size: 60, count: 1, ringAnimationMode: 'rotate', direction: 'forward' },
+  collapsequad: { color: '#ea4335', secondaryColor: '#4285f4', density: 50, intensity: 62, speed: 50, ringWidth: 58, ringAnimationMode: 'rotate', direction: 'forward' },
 };

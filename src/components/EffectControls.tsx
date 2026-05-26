@@ -7,8 +7,8 @@ interface Props {
   onChange: (p: EffectParams) => void;
 }
 
-const DIRECTION_EFFECTS = new Set<EffectType>(['solidring', 'disc', 'googleone', 'duotone', 'linxudo']);
-const RING_EFFECTS = new Set<EffectType>(['solidring', 'disc', 'googleone', 'duotone', 'blinkring', 'linxudo']);
+const DIRECTION_EFFECTS = new Set<EffectType>(['solidring', 'disc', 'googleone', 'duotone', 'linxudo', 'collapsequad']);
+const RING_EFFECTS = new Set<EffectType>(['solidring', 'disc', 'googleone', 'duotone', 'blinkring', 'linxudo', 'collapsequad']);
 const COLOR_EFFECTS = new Set<EffectType>([
   'lightning', 'fire', 'glow', 'orbit', 'shield', 'frost', 'ripple', 'petal', 'stardust', 'prism',
   'vortex', 'firework', 'gold', 'spin', 'loader', 'spinner', 'matrix', 'bubble', 'aurora', 'firefly',
@@ -26,6 +26,7 @@ const INTENSITY_EFFECTS = new Set<EffectType>([
 ]);
 const SIZE_EFFECTS = new Set<EffectType>(['bounce']);
 const COUNT_EFFECTS = new Set<EffectType>(['bounce']);
+const RING_WIDTH_EFFECTS = new Set<EffectType>(['collapsequad']);
 
 const EffectControls: React.FC<Props> = ({ effect, params, onChange }) => {
   const set = (key: keyof EffectParams, val: number | string) => {
@@ -62,6 +63,16 @@ const EffectControls: React.FC<Props> = ({ effect, params, onChange }) => {
         />
         <span className="val">{params.speed}</span>
       </div>
+      {RING_WIDTH_EFFECTS.has(effect) && (
+        <div className="control-row">
+          <label>环宽</label>
+          <input
+            type="range" min={1} max={100} value={params.ringWidth}
+            onChange={(e) => set('ringWidth', +e.target.value)}
+          />
+          <span className="val">{params.ringWidth}</span>
+        </div>
+      )}
       {SIZE_EFFECTS.has(effect) && (
         <div className="control-row">
           <label>头像尺寸</label>
