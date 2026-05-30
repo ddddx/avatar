@@ -12,7 +12,7 @@ const RING_EFFECTS = new Set<EffectType>(['solidring', 'disc', 'googleone', 'duo
 const COLOR_EFFECTS = new Set<EffectType>([
   'lightning', 'fire', 'glow', 'orbit', 'shield', 'frost', 'ripple', 'petal', 'stardust', 'prism',
   'vortex', 'firework', 'gold', 'spin', 'loader', 'spinner', 'matrix', 'bubble', 'aurora', 'firefly',
-  'rain', 'solidring', 'disc', 'duotone', 'blinkring',
+  'rain', 'solidring', 'disc', 'duotone', 'blinkring', 'axisrings',
 ]);
 const DENSITY_EFFECTS = new Set<EffectType>([
   'lightning', 'fire', 'glow', 'orbit', 'shield', 'frost', 'ripple', 'petal', 'stardust', 'prism',
@@ -26,7 +26,7 @@ const INTENSITY_EFFECTS = new Set<EffectType>([
 ]);
 const SIZE_EFFECTS = new Set<EffectType>(['bounce']);
 const COUNT_EFFECTS = new Set<EffectType>(['bounce']);
-const RING_WIDTH_EFFECTS = new Set<EffectType>(['collapsequad']);
+const RING_WIDTH_EFFECTS = new Set<EffectType>(['collapsequad', 'axisrings']);
 
 const EffectControls: React.FC<Props> = ({ effect, params, onChange }) => {
   const set = (key: keyof EffectParams, val: number | string) => {
@@ -95,12 +95,12 @@ const EffectControls: React.FC<Props> = ({ effect, params, onChange }) => {
       )}
       {COLOR_EFFECTS.has(effect) && (
         <div className="control-row colors">
-          <label>主色</label>
+          <label>{effect === 'axisrings' ? '外环' : '主色'}</label>
           <input
             type="color" value={params.color}
             onChange={(e) => set('color', e.target.value)}
           />
-          <label>副色</label>
+          <label>{effect === 'axisrings' ? '内环' : '副色'}</label>
           <input
             type="color" value={params.secondaryColor}
             onChange={(e) => set('secondaryColor', e.target.value)}

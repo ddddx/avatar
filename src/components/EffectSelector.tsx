@@ -24,6 +24,7 @@ const effectsByCategory: Record<EffectCategory, { type: EffectType; icon: string
     { type: 'linxudo',   icon: '⚫', label: 'LinxuDo' },
     { type: 'bounce',    icon: '🏀', label: '弹跳头像' },
     { type: 'collapsequad', icon: '🔴', label: '收缩四色环' },
+    { type: 'axisrings', icon: '◎', label: '双轴圆环' },
     { type: 'orbit',     icon: '💫', label: '环形粒子' },
     { type: 'spin',      icon: '🔄', label: '旋转' },
     { type: 'loader',    icon: '⏳', label: '加载中' },

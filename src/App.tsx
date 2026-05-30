@@ -9,6 +9,8 @@ import {
   EFFECT_PRESETS,
   RING_LOOP_FRAME_COUNT,
   RING_LOOP_FRAME_DELAY_MS,
+  RING_LOOP_DURATION_MS,
+  RING_LOOP_SPEED_BASELINE,
 } from './effects/types';
 import type { EffectType, CropShape, EffectParams, MirrorSettings } from './effects/types';
 import { createRingRenderer, getRingAnimationProgress } from './effects/ring-renderer';
@@ -24,7 +26,7 @@ import './App.css';
 const supportsMediaRecorder = typeof MediaRecorder !== 'undefined';
 const supportsWebWorkers = typeof Worker !== 'undefined';
 const GIF_TRANSPARENT_KEY = 0xff00ff;
-const RING_EFFECTS = new Set<EffectType>(['solidring', 'disc', 'googleone', 'duotone', 'blinkring', 'linxudo', 'bounce', 'collapsequad']);
+const RING_EFFECTS = new Set<EffectType>(['solidring', 'disc', 'googleone', 'duotone', 'blinkring', 'linxudo', 'bounce', 'collapsequad', 'axisrings']);
 const TRANSPARENT_STAGE_EFFECTS = new Set<EffectType>(['bounce']);
 const EFFECT_LABELS: Record<EffectType, string> = {
   solidring: '实心环',
@@ -35,6 +37,7 @@ const EFFECT_LABELS: Record<EffectType, string> = {
   linxudo: 'LinxuDo',
   bounce: '弹跳头像',
   collapsequad: '收缩四色环',
+  axisrings: '双轴圆环',
   lightning: '闪电',
   fire: '火焰',
   glow: '炫光',
@@ -89,6 +92,51 @@ function hasTransparentStage(
   return (!image && !gifData) || shape === 'circle' || TRANSPARENT_STAGE_EFFECTS.has(effect);
 }
 
+function getRingExportTiming(effect: EffectType, fallbackFps: number, params: EffectParams) {
+  if (!RING_EFFECTS.has(effect)) {
+    return {
+      frameCount: Math.floor((2000 / 1000) * fallbackFps),
+      frameDelay: Math.round(1000 / fallbackFps),
+    };
+  }
+
+  if (effect === 'axisrings') {
+    const clampedSpeed = Math.max(1, Math.min(params.speed, 100));
+    const loopDuration = RING_LOOP_DURATION_MS * (RING_LOOP_SPEED_BASELINE / clampedSpeed);
+    const frameDelay = Math.round(1000 / fallbackFps);
+
+    return {
+      frameCount: Math.max(2, Math.round(loopDuration / frameDelay) + 1),
+      frameDelay,
+    };
+  }
+
+  return {
+    frameCount: RING_LOOP_FRAME_COUNT,
+    frameDelay: RING_LOOP_FRAME_DELAY_MS,
+  };
+}
+
+function getRingExportFrameProgress(effect: EffectType, frameIndex: number, frameCount: number) {
+  if (effect === 'axisrings' && frameCount > 1) {
+    return frameIndex / (frameCount - 1);
+  }
+
+  return frameIndex / frameCount;
+}
+
+function getSupportedWebMMimeType() {
+  let mimeType = 'video/webm;codecs=vp9';
+  if (!MediaRecorder.isTypeSupported(mimeType)) {
+    mimeType = 'video/webm';
+  }
+  if (!MediaRecorder.isTypeSupported(mimeType)) {
+    throw new Error('WebM 录制不被此浏览器支持');
+  }
+
+  return mimeType;
+}
+
 
 type OfflineRingRendererOptions = {
   width: number;
@@ -130,8 +178,10 @@ function createOfflineRingRenderer({
 
   return {
     frameCanvas,
-    renderFrame(_progress: number, elapsedMs: number) {
-      const animationProgress = getRingAnimationProgress(params.speed, elapsedMs);
+    renderFrame(exportProgress: number, elapsedMs: number) {
+      const animationProgress = effect === 'axisrings'
+        ? exportProgress
+        : getRingAnimationProgress(params.speed, elapsedMs);
       renderer.render(ctx, params, animationProgress, elapsedMs);
       return frameCanvas;
     }
@@ -243,18 +293,69 @@ function App() {
 
   // Export as WebM (MediaRecorder)
   const exportWebM = useCallback(async (canvas: HTMLCanvasElement) => {
-    const duration = 2000;
     const fps = 20;
-    const stream = canvas.captureStream(fps);
+    const mimeType = getSupportedWebMMimeType();
 
-    // Try vp9 first, fall back to any supported codec
-    let mimeType = 'video/webm;codecs=vp9';
-    if (!MediaRecorder.isTypeSupported(mimeType)) {
-      mimeType = 'video/webm';
+    if (effect === 'axisrings') {
+      const { frameCount, frameDelay } = getRingExportTiming(effect, fps, params);
+      const frameCanvas = document.createElement('canvas');
+      frameCanvas.width = canvas.width;
+      frameCanvas.height = canvas.height;
+      const frameCtx = frameCanvas.getContext('2d');
+      if (!frameCtx) {
+        throw new Error('无法创建 WebM 导出画布');
+      }
+
+      const ringRenderer = createOfflineRingRenderer({
+        width: canvas.width,
+        height: canvas.height,
+        image,
+        gifData,
+        effect,
+        shape,
+        mirror,
+        params,
+      });
+      const stream = frameCanvas.captureStream(0);
+      const track = stream.getVideoTracks()[0] as MediaStreamTrack & { requestFrame?: () => void };
+      const recorder = new MediaRecorder(stream, {
+        mimeType,
+        videoBitsPerSecond: 5000000,
+      });
+      const chunks: Blob[] = [];
+      recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+
+      await new Promise<void>((resolve, reject) => {
+        recorder.onerror = () => reject(new Error('WebM 录制失败'));
+        recorder.onstop = () => {
+          const blob = new Blob(chunks, { type: 'video/webm' });
+          downloadBlob(blob, `avatar-${effect}.webm`);
+          resolve();
+        };
+
+        recorder.start();
+
+        const renderFrames = async () => {
+          for (let i = 0; i < frameCount; i++) {
+            const ringProgress = getRingExportFrameProgress(effect, i, frameCount);
+            const sourceCanvas = ringRenderer.renderFrame(ringProgress, i * frameDelay);
+            frameCtx.clearRect(0, 0, frameCanvas.width, frameCanvas.height);
+            frameCtx.drawImage(sourceCanvas, 0, 0);
+            track.requestFrame?.();
+            setExportProgress((i + 1) / frameCount * 0.95);
+            await new Promise(r => setTimeout(r, frameDelay));
+          }
+          setExportProgress(1);
+          recorder.stop();
+        };
+
+        void renderFrames().catch(reject);
+      });
+      return;
     }
-    if (!MediaRecorder.isTypeSupported(mimeType)) {
-      throw new Error('WebM 录制不被此浏览器支持');
-    }
+
+    const duration = 2000;
+    const stream = canvas.captureStream(fps);
 
     const recorder = new MediaRecorder(stream, {
       mimeType,
@@ -282,11 +383,10 @@ function App() {
         recorder.stop();
       }, duration);
     });
-  }, [effect, downloadBlob]);
+  }, [effect, downloadBlob, gifData, image, mirror, params, shape]);
 
   // Export as GIF (gif.js with Web Worker, fallback to frames)
   const exportGIF = useCallback(async (canvas: HTMLCanvasElement) => {
-    const duration = 2000;
     const fps = 15; // Lower fps for smaller GIF
     const transparentStage = hasTransparentStage(effect, shape, image, gifData);
 
@@ -304,9 +404,7 @@ function App() {
       transparent: transparentStage ? GIF_TRANSPARENT_KEY : undefined,
     });
 
-    const frameCount = RING_EFFECTS.has(effect) ? RING_LOOP_FRAME_COUNT : Math.floor((duration / 1000) * fps);
-    const frameDelay = Math.round(1000 / fps);
-    const captureDelay = RING_EFFECTS.has(effect) ? RING_LOOP_FRAME_DELAY_MS : frameDelay;
+    const { frameCount, frameDelay: captureDelay } = getRingExportTiming(effect, fps, params);
     const exportCanvas = canvas as ExportDrivenCanvas;
     const ringRenderer = RING_EFFECTS.has(effect)
       ? createOfflineRingRenderer({
@@ -341,13 +439,14 @@ function App() {
 
       // Capture frames
       for (let i = 0; i < frameCount; i++) {
+        const ringProgress = getRingExportFrameProgress(effect, i, frameCount);
         if (RING_EFFECTS.has(effect) && !ringRenderer) {
-          exportCanvas.__avatarSetRingLoopProgress?.(i / frameCount);
+          exportCanvas.__avatarSetRingLoopProgress?.(ringProgress);
           exportCanvas.__avatarRenderFrame?.();
         }
 
         const sourceCanvas = RING_EFFECTS.has(effect)
-          ? (ringRenderer?.renderFrame(i / frameCount, i * captureDelay) ?? exportCanvas.__avatarExtractFrame?.() ?? canvas)
+          ? (ringRenderer?.renderFrame(ringProgress, i * captureDelay) ?? exportCanvas.__avatarExtractFrame?.() ?? canvas)
           : canvas;
 
         if (offscreen && offCtx) {
@@ -379,7 +478,7 @@ function App() {
         }
         setExportProgress((i + 1) / frameCount * 0.5);
         if (!RING_EFFECTS.has(effect)) {
-          await new Promise(r => setTimeout(r, frameDelay));
+          await new Promise(r => setTimeout(r, captureDelay));
         }
       }
     } finally {
@@ -411,10 +510,8 @@ function App() {
   // Export as PNG sequence frames (most compatible)
   // Export as APNG (animated PNG with full alpha support)
   const exportAPNG = useCallback(async (canvas: HTMLCanvasElement) => {
-    const duration = 2000;
     const fps = 15;
-    const frameCount = RING_EFFECTS.has(effect) ? RING_LOOP_FRAME_COUNT : Math.floor((duration / 1000) * fps);
-    const frameDelay = RING_EFFECTS.has(effect) ? RING_LOOP_FRAME_DELAY_MS : Math.round(1000 / fps);
+    const { frameCount, frameDelay } = getRingExportTiming(effect, fps, params);
     const w = canvas.width;
     const h = canvas.height;
     const exportCanvas = canvas as ExportDrivenCanvas;
@@ -446,13 +543,14 @@ function App() {
       }
 
       for (let i = 0; i < frameCount; i++) {
+        const ringProgress = getRingExportFrameProgress(effect, i, frameCount);
         if (RING_EFFECTS.has(effect) && !ringRenderer) {
-          exportCanvas.__avatarSetRingLoopProgress?.(i / frameCount);
+          exportCanvas.__avatarSetRingLoopProgress?.(ringProgress);
           exportCanvas.__avatarRenderFrame?.();
         }
 
         const sourceCanvas = RING_EFFECTS.has(effect)
-          ? (ringRenderer?.renderFrame(i / frameCount, i * frameDelay) ?? exportCanvas.__avatarExtractFrame?.() ?? canvas)
+          ? (ringRenderer?.renderFrame(ringProgress, i * frameDelay) ?? exportCanvas.__avatarExtractFrame?.() ?? canvas)
           : canvas;
 
         offCtx.clearRect(0, 0, w, h);
@@ -484,11 +582,9 @@ function App() {
 
   // Export as animated WebP (single .webp file) using wasm-webp
   const exportWebP = useCallback(async (canvas: HTMLCanvasElement) => {
-    const duration = 2000;
     const fps = 12;
     const transparentStage = hasTransparentStage(effect, shape, image, gifData);
-    const frameCount = RING_EFFECTS.has(effect) ? RING_LOOP_FRAME_COUNT : Math.floor((duration / 1000) * fps);
-    const frameDelay = RING_EFFECTS.has(effect) ? RING_LOOP_FRAME_DELAY_MS : Math.round(1000 / fps);
+    const { frameCount, frameDelay } = getRingExportTiming(effect, fps, params);
     const w = canvas.width;
     const h = canvas.height;
     const exportCanvas = canvas as ExportDrivenCanvas;
@@ -517,13 +613,14 @@ function App() {
       }
 
       for (let i = 0; i < frameCount; i++) {
+        const ringProgress = getRingExportFrameProgress(effect, i, frameCount);
         if (RING_EFFECTS.has(effect) && !ringRenderer) {
-          exportCanvas.__avatarSetRingLoopProgress?.(i / frameCount);
+          exportCanvas.__avatarSetRingLoopProgress?.(ringProgress);
           exportCanvas.__avatarRenderFrame?.();
         }
 
         const sourceCanvas = RING_EFFECTS.has(effect)
-          ? (ringRenderer?.renderFrame(i / frameCount, i * frameDelay) ?? exportCanvas.__avatarExtractFrame?.() ?? canvas)
+          ? (ringRenderer?.renderFrame(ringProgress, i * frameDelay) ?? exportCanvas.__avatarExtractFrame?.() ?? canvas)
           : canvas;
 
         ctx.clearRect(0, 0, w, h);
@@ -590,7 +687,7 @@ function App() {
           </div>
         </div>
         <div className="header-badges">
-          <span className="meta-pill">29 种特效</span>
+          <span className="meta-pill">30 种特效</span>
           <span className="meta-pill">圆外透明导出</span>
           <span className="meta-pill">GIF / APNG / WebP / WebM</span>
         </div>

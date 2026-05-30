@@ -6,7 +6,7 @@ import {
 import type { CropShape, EffectParams, EffectType, MirrorSettings } from './types';
 import type { GifData } from '../lib/gif-decoder';
 
-const RING_EFFECTS = new Set<EffectType>(['solidring', 'disc', 'googleone', 'duotone', 'blinkring', 'linxudo', 'bounce', 'collapsequad']);
+const RING_EFFECTS = new Set<EffectType>(['solidring', 'disc', 'googleone', 'duotone', 'blinkring', 'linxudo', 'bounce', 'collapsequad', 'axisrings']);
 const SOLID_RING_COLORS = ['#ff0040', '#ff8000', '#00ff80', '#00b0ff', '#ff0040'];
 const DISC_COLORS = ['#ff0040', '#ff8000', '#ffe000', '#00ff80', '#00b0ff', '#a040ff', '#ff0040'];
 const COLLAPSE_QUAD_COLORS = ['#EA4335', '#4285F4', '#34A853', '#FBBC05'] as const;
@@ -238,6 +238,180 @@ function drawCollapseQuadRing(
     ctx.stroke();
   }
 
+  ctx.restore();
+}
+
+type AxisRingLayer = 'back' | 'front';
+
+type AxisRingLayout = {
+  centerX: number;
+  centerY: number;
+  ringWidth: number;
+  outerRadius: number;
+  innerRadius: number;
+  sourceDiameter: number;
+};
+
+type AxisRingSegment = {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  depth: number;
+  color: string;
+  ringWidth: number;
+};
+
+function getAxisRingLayout(width: number, height: number, params: EffectParams): AxisRingLayout {
+  const centerX = width / 2;
+  const centerY = height / 2;
+  const minSize = Math.min(width, height);
+  const ringWidth = 6 + (Math.max(1, Math.min(params.ringWidth, 100)) / 100) * 32;
+  const outerRadius = minSize / 2 - ringWidth / 2;
+  const innerRadius = Math.max(0, outerRadius - ringWidth);
+  const sourceDiameter = Math.max(0, (innerRadius - ringWidth / 2) * 2);
+
+  return {
+    centerX,
+    centerY,
+    ringWidth,
+    outerRadius,
+    innerRadius,
+    sourceDiameter,
+  };
+}
+
+function getAxisRingSegments(
+  centerX: number,
+  centerY: number,
+  radius: number,
+  ringWidth: number,
+  phase: number,
+  axisAngle: number,
+  color: string,
+): AxisRingSegment[] {
+  const samples = 96;
+  const points: Array<{ x: number; y: number; depth: number }> = [];
+  const projectedScale = Math.cos(phase);
+
+  for (let i = 0; i <= samples; i++) {
+    const angle = (i / samples) * Math.PI * 2;
+    const axisDistance = Math.cos(angle) * radius;
+    const perpendicularDistance = Math.sin(angle) * radius;
+    const projectedDistance = perpendicularDistance * projectedScale;
+    const depth = perpendicularDistance * Math.sin(phase);
+    const rotatedX = axisDistance * Math.cos(axisAngle) - projectedDistance * Math.sin(axisAngle);
+    const rotatedY = axisDistance * Math.sin(axisAngle) + projectedDistance * Math.cos(axisAngle);
+    points.push({
+      x: centerX + rotatedX,
+      y: centerY + rotatedY,
+      depth,
+    });
+  }
+
+  const segments: AxisRingSegment[] = [];
+
+  for (let i = 0; i < samples; i++) {
+    const a = points[i];
+    const b = points[i + 1];
+    segments.push({
+      x1: a.x,
+      y1: a.y,
+      x2: b.x,
+      y2: b.y,
+      depth: (a.depth + b.depth) / 2,
+      color,
+      ringWidth,
+    });
+  }
+
+  return segments;
+}
+
+function drawAxisRingSegments(
+  ctx: CanvasRenderingContext2D,
+  segments: AxisRingSegment[],
+  layer: AxisRingLayer,
+) {
+  const visibleSegments = segments
+    .filter((segment) => (layer === 'front' ? segment.depth >= 0 : segment.depth < 0))
+    .sort((a, b) => a.depth - b.depth);
+
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.globalAlpha = 1;
+
+  for (const segment of visibleSegments) {
+    ctx.lineWidth = segment.ringWidth;
+    ctx.strokeStyle = segment.color;
+    ctx.beginPath();
+    ctx.moveTo(segment.x1, segment.y1);
+    ctx.lineTo(segment.x2, segment.y2);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+function getAxisRingSceneSegments(
+  width: number,
+  height: number,
+  params: EffectParams,
+  progress: number,
+): AxisRingSegment[] {
+  const layout = getAxisRingLayout(width, height, params);
+  const direction = params.direction === 'reverse' ? -1 : 1;
+  const turn = wrapUnit(progress * direction) * Math.PI * 2;
+  const outerPhase = turn;
+  const innerPhase = turn + Math.PI / 2;
+  const outerAxis = -Math.PI / 10;
+  const innerAxis = Math.PI / 2.7;
+
+  return [
+    ...getAxisRingSegments(layout.centerX, layout.centerY, layout.innerRadius, layout.ringWidth, innerPhase, innerAxis, params.secondaryColor),
+    ...getAxisRingSegments(layout.centerX, layout.centerY, layout.outerRadius, layout.ringWidth, outerPhase, outerAxis, params.color),
+  ];
+}
+
+function drawAxisRings(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  params: EffectParams,
+  progress: number,
+  layer: AxisRingLayer,
+) {
+  const segments = getAxisRingSceneSegments(width, height, params, progress);
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'source-over';
+  drawAxisRingSegments(ctx, segments, layer);
+  ctx.restore();
+}
+
+function drawAxisRingSource(
+  ctx: CanvasRenderingContext2D,
+  source: CanvasImageSource,
+  sourceWidth: number,
+  sourceHeight: number,
+  params: EffectParams,
+  mirror: MirrorSettings,
+  shape: CropShape,
+  width: number,
+  height: number,
+) {
+  const layout = getAxisRingLayout(width, height, params);
+  if (layout.sourceDiameter <= 0) return;
+
+  const x = layout.centerX - layout.sourceDiameter / 2;
+  const y = layout.centerY - layout.sourceDiameter / 2;
+
+  ctx.save();
+  ctx.translate(x, y);
+  clipShapePath(ctx, shape, layout.sourceDiameter, layout.sourceDiameter);
+  ctx.clip();
+  drawCoveredSource(ctx, source, sourceWidth, sourceHeight, mirror, layout.sourceDiameter, layout.sourceDiameter);
   ctx.restore();
 }
 
@@ -516,21 +690,35 @@ export function createRingRenderer({
         return;
       }
 
-      if (hasSource) {
-        ctx.save();
-        clipShapePath(ctx, shape, width, height);
-        ctx.clip();
+      if (effect === 'axisrings') {
+        drawAxisRings(ctx, width, height, params, progress, 'back');
+      }
 
+      if (hasSource) {
         if (gifSource && gifFrameCanvas && gifFrameCtx) {
           const frame = gifSource.frames[getGifFrameIndexAtTime(gifSource, elapsedMs)];
           gifFrameCtx.clearRect(0, 0, gifFrameCanvas.width, gifFrameCanvas.height);
           gifFrameCtx.putImageData(frame.imageData, 0, 0);
-          drawCoveredSource(ctx, gifFrameCanvas, gifSource.width, gifSource.height, mirror, width, height);
+          if (effect === 'axisrings') {
+            drawAxisRingSource(ctx, gifFrameCanvas, gifSource.width, gifSource.height, params, mirror, shape, width, height);
+          } else {
+            ctx.save();
+            clipShapePath(ctx, shape, width, height);
+            ctx.clip();
+            drawCoveredSource(ctx, gifFrameCanvas, gifSource.width, gifSource.height, mirror, width, height);
+            ctx.restore();
+          }
         } else if (image) {
-          drawCoveredSource(ctx, image, image.width, image.height, mirror, width, height);
+          if (effect === 'axisrings') {
+            drawAxisRingSource(ctx, image, image.width, image.height, params, mirror, shape, width, height);
+          } else {
+            ctx.save();
+            clipShapePath(ctx, shape, width, height);
+            ctx.clip();
+            drawCoveredSource(ctx, image, image.width, image.height, mirror, width, height);
+            ctx.restore();
+          }
         }
-
-        ctx.restore();
       }
 
       const animation = getRingAnimationState(params, progress);
@@ -541,6 +729,11 @@ export function createRingRenderer({
 
       if (effect === 'collapsequad') {
         drawCollapseQuadRing(ctx, width, height, params, animation, progress);
+        return;
+      }
+
+      if (effect === 'axisrings') {
+        drawAxisRings(ctx, width, height, params, progress, 'front');
         return;
       }
 
