@@ -292,20 +292,22 @@ function getAxisRingSegments(
 ): AxisRingSegment[] {
   const samples = 96;
   const points: Array<{ x: number; y: number; depth: number }> = [];
-  const projectedScale = Math.cos(phase);
+  const axisX = Math.cos(axisAngle);
+  const axisY = Math.sin(axisAngle);
+  const perpX = -Math.sin(axisAngle);
+  const perpY = Math.cos(axisAngle);
+  const flipProjection = Math.cos(phase);
+  const depthProjection = Math.sin(phase);
 
   for (let i = 0; i <= samples; i++) {
     const angle = (i / samples) * Math.PI * 2;
     const axisDistance = Math.cos(angle) * radius;
     const perpendicularDistance = Math.sin(angle) * radius;
-    const projectedDistance = perpendicularDistance * projectedScale;
-    const depth = perpendicularDistance * Math.sin(phase);
-    const rotatedX = axisDistance * Math.cos(axisAngle) - projectedDistance * Math.sin(axisAngle);
-    const rotatedY = axisDistance * Math.sin(axisAngle) + projectedDistance * Math.cos(axisAngle);
+    const projectedDistance = perpendicularDistance * flipProjection;
     points.push({
-      x: centerX + rotatedX,
-      y: centerY + rotatedY,
-      depth,
+      x: centerX + axisDistance * axisX + projectedDistance * perpX,
+      y: centerY + axisDistance * axisY + projectedDistance * perpY,
+      depth: perpendicularDistance * depthProjection,
     });
   }
 
@@ -363,10 +365,10 @@ function getAxisRingSceneSegments(
   const layout = getAxisRingLayout(width, height, params);
   const direction = params.direction === 'reverse' ? -1 : 1;
   const turn = wrapUnit(progress * direction) * Math.PI * 2;
-  const outerPhase = turn;
-  const innerPhase = turn + Math.PI / 2;
-  const outerAxis = -Math.PI / 10;
-  const innerAxis = Math.PI / 2.7;
+  const outerPhase = turn * 2;
+  const innerPhase = turn * 2 + Math.PI / 2;
+  const outerAxis = -Math.PI / 10 + turn;
+  const innerAxis = Math.PI / 2.7 - turn;
 
   return [
     ...getAxisRingSegments(layout.centerX, layout.centerY, layout.innerRadius, layout.ringWidth, innerPhase, innerAxis, params.secondaryColor),
