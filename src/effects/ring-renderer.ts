@@ -38,6 +38,10 @@ function wrapUnit(value: number) {
   return ((value % 1) + 1) % 1;
 }
 
+function clampNumber(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(value, max));
+}
+
 function traceRoundedRectPath(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -113,6 +117,18 @@ function lerpHexColor(a: string, b: string, t: number) {
   const g = Math.round(c1.g + (c2.g - c1.g) * t);
   const bValue = Math.round(c1.b + (c2.b - c1.b) * t);
   return `rgb(${r}, ${g}, ${bValue})`;
+}
+
+function shadeHexColor(hex: string, amount: number) {
+  const base = hexToRgb(hex);
+  const shade = clampNumber(amount, -1, 1);
+  const target = shade >= 0 ? 255 : 0;
+  const t = Math.abs(shade);
+  const r = Math.round(base.r + (target - base.r) * t);
+  const g = Math.round(base.g + (target - base.g) * t);
+  const b = Math.round(base.b + (target - base.b) * t);
+
+  return `rgb(${r}, ${g}, ${b})`;
 }
 
 function addSampledPaletteStops(gradient: CanvasGradient, colors: readonly string[]) {
@@ -260,6 +276,7 @@ type AxisRingSegment = {
   depth: number;
   color: string;
   ringWidth: number;
+  ringOrder: number;
 };
 
 function getAxisRingLayout(width: number, height: number, params: EffectParams): AxisRingLayout {
@@ -281,6 +298,15 @@ function getAxisRingLayout(width: number, height: number, params: EffectParams):
   };
 }
 
+function getAxisRingSegmentColor(color: string, materialAngle: number, depth: number, radius: number) {
+  const depthRatio = radius > 0 ? clampNumber(depth / radius, -1, 1) : 0;
+  const depthShade = depthRatio * 0.2;
+  const materialShade = Math.sin(materialAngle * 6 - Math.PI / 5) * 0.055;
+  const fixedHighlight = Math.max(0, Math.cos(materialAngle - Math.PI * 0.35)) ** 12 * 0.18;
+
+  return shadeHexColor(color, depthShade + materialShade + fixedHighlight - 0.035);
+}
+
 function getAxisRingSegments(
   centerX: number,
   centerY: number,
@@ -289,25 +315,28 @@ function getAxisRingSegments(
   phase: number,
   axisAngle: number,
   color: string,
+  ringOrder: number,
 ): AxisRingSegment[] {
-  const samples = 96;
+  const samples = 160;
   const points: Array<{ x: number; y: number; depth: number }> = [];
   const axisX = Math.cos(axisAngle);
   const axisY = Math.sin(axisAngle);
   const perpX = -Math.sin(axisAngle);
   const perpY = Math.cos(axisAngle);
-  const flipProjection = Math.cos(phase);
-  const depthProjection = Math.sin(phase);
+  const phaseCos = Math.cos(phase);
+  const phaseSin = Math.sin(phase);
 
   for (let i = 0; i <= samples; i++) {
     const angle = (i / samples) * Math.PI * 2;
     const axisDistance = Math.cos(angle) * radius;
     const perpendicularDistance = Math.sin(angle) * radius;
-    const projectedDistance = perpendicularDistance * flipProjection;
+    const projectedDistance = perpendicularDistance * phaseCos;
+    const depth = perpendicularDistance * phaseSin;
+
     points.push({
       x: centerX + axisDistance * axisX + projectedDistance * perpX,
       y: centerY + axisDistance * axisY + projectedDistance * perpY,
-      depth: perpendicularDistance * depthProjection,
+      depth,
     });
   }
 
@@ -316,14 +345,18 @@ function getAxisRingSegments(
   for (let i = 0; i < samples; i++) {
     const a = points[i];
     const b = points[i + 1];
+    const depth = (a.depth + b.depth) / 2;
+    const materialAngle = ((i + 0.5) / samples) * Math.PI * 2;
+
     segments.push({
       x1: a.x,
       y1: a.y,
       x2: b.x,
       y2: b.y,
-      depth: (a.depth + b.depth) / 2,
-      color,
+      depth,
+      color: getAxisRingSegmentColor(color, materialAngle, depth, radius),
       ringWidth,
+      ringOrder,
     });
   }
 
@@ -337,7 +370,13 @@ function drawAxisRingSegments(
 ) {
   const visibleSegments = segments
     .filter((segment) => (layer === 'front' ? segment.depth >= 0 : segment.depth < 0))
-    .sort((a, b) => a.depth - b.depth);
+    .sort((a, b) => {
+      const ringDelta = a.ringOrder - b.ringOrder;
+      if (ringDelta !== 0) return ringDelta;
+
+      const depthDelta = a.depth - b.depth;
+      return Math.abs(depthDelta) > 0.01 ? depthDelta : 0;
+    });
 
   ctx.save();
   ctx.lineCap = 'round';
@@ -365,14 +404,14 @@ function getAxisRingSceneSegments(
   const layout = getAxisRingLayout(width, height, params);
   const direction = params.direction === 'reverse' ? -1 : 1;
   const turn = wrapUnit(progress * direction) * Math.PI * 2;
-  const outerPhase = turn * 2;
-  const innerPhase = turn * 2 + Math.PI / 2;
+  const outerPhase = turn;
+  const innerPhase = turn + Math.PI / 2;
   const outerAxis = -Math.PI / 10 + turn;
   const innerAxis = Math.PI / 2.7 - turn;
 
   return [
-    ...getAxisRingSegments(layout.centerX, layout.centerY, layout.innerRadius, layout.ringWidth, innerPhase, innerAxis, params.secondaryColor),
-    ...getAxisRingSegments(layout.centerX, layout.centerY, layout.outerRadius, layout.ringWidth, outerPhase, outerAxis, params.color),
+    ...getAxisRingSegments(layout.centerX, layout.centerY, layout.innerRadius, layout.ringWidth, innerPhase, innerAxis, params.secondaryColor, 0),
+    ...getAxisRingSegments(layout.centerX, layout.centerY, layout.outerRadius, layout.ringWidth, outerPhase, outerAxis, params.color, 1),
   ];
 }
 
