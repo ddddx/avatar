@@ -63,17 +63,16 @@ const effectsByCategory: Record<EffectCategory, { type: EffectType; icon: string
   ],
 };
 
-const EffectSelector: React.FC<Props> = ({ selected, onChange }) => {
-  const [category, setCategory] = React.useState<EffectCategory>('ring');
+function getEffectCategory(effectType: EffectType): EffectCategory {
+  return categories.find(({ id }) =>
+    effectsByCategory[id].some((effect) => effect.type === effectType),
+  )?.id ?? 'ring';
+}
 
-  React.useEffect(() => {
-    const nextCategory = categories.find(({ id }) =>
-      effectsByCategory[id].some((effect) => effect.type === selected),
-    )?.id;
-    if (nextCategory) {
-      setCategory(nextCategory);
-    }
-  }, [selected]);
+const EffectSelector: React.FC<Props> = ({ selected, onChange }) => {
+  const selectedCategory = getEffectCategory(selected);
+  const [view, setView] = React.useState({ category: selectedCategory, selected });
+  const category = view.selected === selected ? view.category : selectedCategory;
 
   return (
     <>
@@ -83,7 +82,7 @@ const EffectSelector: React.FC<Props> = ({ selected, onChange }) => {
             key={item.id}
             type="button"
             className={`effect-tab ${category === item.id ? 'active' : ''}`}
-            onClick={() => setCategory(item.id)}
+            onClick={() => setView({ category: item.id, selected })}
           >
             {item.label}
           </button>

@@ -117,7 +117,7 @@ function traceRoundRectTrackSegment(
   startT: number,
   endT: number,
 ) {
-  let from = wrapUnit(startT);
+  const from = wrapUnit(startT);
   let to = endT;
   while (to < from) to += 1;
   const steps = Math.max(5, Math.ceil((to - from) * 120));
@@ -346,7 +346,7 @@ function strokeTrackSegment(
   endT: number,
 ) {
   if (shape === 'circle') {
-    let from = wrapUnit(startT);
+    const from = wrapUnit(startT);
     let to = endT;
     while (to < from) to += 1;
     ctx.arc(cx, cy, half, from * Math.PI * 2, to * Math.PI * 2);
@@ -1326,8 +1326,8 @@ function getBounceTrajectoryPoint(progress: number, index: number, count: number
   const xPhase = preset.xPhase + spread * 0.5 + variantCycle * 0.125;
   const yPhase = preset.yPhase + spread * 0.75 + variantCycle * 0.25;
 
-  let x = 0;
-  let y = 0;
+  let x: number;
+  let y: number;
 
   if (preset.family === 'pingpong') {
     x = getSignedBounceAxis(progress * xTurns + xPhase) * preset.xAmplitude;
