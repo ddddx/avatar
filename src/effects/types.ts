@@ -108,7 +108,7 @@ export const DEFAULT_PARAMS: EffectParams = {
 
 export const EFFECT_PRESETS: Record<EffectType, Partial<EffectParams>> = {
   lightning: { color: '#4dc9f6', secondaryColor: '#a855f7', density: 40, intensity: 60, speed: 35 },
-  fire:      { color: '#ff4500', secondaryColor: '#ffd700', density: 65, intensity: 75, speed: 55 },
+  fire:      { color: '#ff5a1f', secondaryColor: '#ffd166', density: 72, intensity: 78, speed: 55 },
   glow:      { color: '#c084fc', secondaryColor: '#f472b6', density: 55, intensity: 60, speed: 40 },
   orbit:     { color: '#34d399', secondaryColor: '#60a5fa', density: 40, intensity: 55, speed: 50 },
   shield:    { color: '#22d3ee', secondaryColor: '#a78bfa', density: 50, intensity: 65, speed: 35 },
@@ -125,9 +125,9 @@ export const EFFECT_PRESETS: Record<EffectType, Partial<EffectParams>> = {
   spinner:   { color: '#4dc9f6', secondaryColor: '#a855f7', density: 30, intensity: 55, speed: 55 },
   matrix:    { color: '#22c55e', secondaryColor: '#16a34a', density: 60, intensity: 65, speed: 45 },
   bubble:    { color: '#67e8f9', secondaryColor: '#a5f3fc', density: 55, intensity: 55, speed: 40 },
-  aurora:    { color: '#22d3ee', secondaryColor: '#a78bfa', density: 50, intensity: 60, speed: 35 },
+  aurora:    { color: '#2dd4bf', secondaryColor: '#a78bfa', density: 58, intensity: 68, speed: 34 },
   firefly:   { color: '#fbbf24', secondaryColor: '#34d399', density: 55, intensity: 50, speed: 30 },
-  rain:      { color: '#60a5fa', secondaryColor: '#93c5fd', density: 60, intensity: 55, speed: 55 },
+  rain:      { color: '#60a5fa', secondaryColor: '#dbeafe', density: 70, intensity: 64, speed: 58 },
   solidring: { color: '#00d4ff', secondaryColor: '#ff6b35', density: 50, intensity: 60, speed: 50, ringAnimationMode: 'rotate', direction: 'forward' },
   disc:      { color: '#00b0ff', secondaryColor: '#ff0040', density: 60, intensity: 55, speed: 50, ringAnimationMode: 'rotate', direction: 'forward' },
   googleone: { color: '#ea4335', secondaryColor: '#34a853', density: 50, intensity: 60, speed: 50, ringAnimationMode: 'rotate', direction: 'forward' },
