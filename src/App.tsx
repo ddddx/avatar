@@ -7,13 +7,11 @@ import PreviewCanvas from './components/PreviewCanvas';
 import {
   DEFAULT_PARAMS,
   EFFECT_PRESETS,
-  RING_LOOP_FRAME_COUNT,
-  RING_LOOP_FRAME_DELAY_MS,
   RING_LOOP_DURATION_MS,
   RING_LOOP_SPEED_BASELINE,
 } from './effects/types';
 import type { EffectType, CropShape, EffectParams, MirrorSettings } from './effects/types';
-import { createRingRenderer, getRingAnimationProgress } from './effects/ring-renderer';
+import { createRingRenderer } from './effects/ring-renderer';
 // @ts-ignore - gif.js browser bundle has no types
 import GIF from 'gif.js/dist/gif.js';
 // @ts-ignore - upng-js has no types
@@ -26,7 +24,7 @@ import './App.css';
 const supportsMediaRecorder = typeof MediaRecorder !== 'undefined';
 const supportsWebWorkers = typeof Worker !== 'undefined';
 const GIF_TRANSPARENT_KEY = 0xff00ff;
-const RING_EFFECTS = new Set<EffectType>(['solidring', 'disc', 'googleone', 'duotone', 'blinkring', 'linxudo', 'bounce', 'collapsequad', 'axisrings']);
+const RING_EFFECTS = new Set<EffectType>(['solidring', 'disc', 'googleone', 'duotone', 'blinkring', 'linxudo', 'bounce', 'collapsequad', 'axisrings', 'loader', 'spinner']);
 const TRANSPARENT_STAGE_EFFECTS = new Set<EffectType>(['bounce']);
 const EFFECT_LABELS: Record<EffectType, string> = {
   solidring: '实心环',
@@ -100,29 +98,19 @@ function getRingExportTiming(effect: EffectType, fallbackFps: number, params: Ef
     };
   }
 
-  if (effect === 'axisrings') {
-    const clampedSpeed = Math.max(1, Math.min(params.speed, 100));
-    const loopDuration = RING_LOOP_DURATION_MS * (RING_LOOP_SPEED_BASELINE / clampedSpeed);
-    const frameDelay = Math.round(1000 / fallbackFps);
-
-    return {
-      frameCount: Math.max(2, Math.round(loopDuration / frameDelay) + 1),
-      frameDelay,
-    };
-  }
+  const clampedSpeed = Math.max(1, Math.min(params.speed, 100));
+  const loopDuration = RING_LOOP_DURATION_MS * (RING_LOOP_SPEED_BASELINE / clampedSpeed);
+  const frameDelay = Math.round(1000 / fallbackFps);
 
   return {
-    frameCount: RING_LOOP_FRAME_COUNT,
-    frameDelay: RING_LOOP_FRAME_DELAY_MS,
+    frameCount: Math.max(2, Math.round(loopDuration / frameDelay) + 1),
+    frameDelay,
   };
 }
 
-function getRingExportFrameProgress(effect: EffectType, frameIndex: number, frameCount: number) {
-  if (effect === 'axisrings' && frameCount > 1) {
-    return frameIndex / (frameCount - 1);
-  }
-
-  return frameIndex / frameCount;
+function getRingExportFrameProgress(_effect: EffectType, frameIndex: number, frameCount: number) {
+  if (frameCount <= 1) return 0;
+  return frameIndex / (frameCount - 1);
 }
 
 function getSupportedWebMMimeType() {
@@ -179,10 +167,7 @@ function createOfflineRingRenderer({
   return {
     frameCanvas,
     renderFrame(exportProgress: number, elapsedMs: number) {
-      const animationProgress = effect === 'axisrings'
-        ? exportProgress
-        : getRingAnimationProgress(params.speed, elapsedMs);
-      renderer.render(ctx, params, animationProgress, elapsedMs);
+      renderer.render(ctx, params, exportProgress, elapsedMs);
       return frameCanvas;
     }
   }

@@ -6,7 +6,7 @@ import {
 import type { CropShape, EffectParams, EffectType, MirrorSettings } from './types';
 import type { GifData } from '../lib/gif-decoder';
 
-const RING_EFFECTS = new Set<EffectType>(['solidring', 'disc', 'googleone', 'duotone', 'blinkring', 'linxudo', 'bounce', 'collapsequad', 'axisrings']);
+const RING_EFFECTS = new Set<EffectType>(['solidring', 'disc', 'googleone', 'duotone', 'blinkring', 'linxudo', 'bounce', 'collapsequad', 'axisrings', 'loader', 'spinner']);
 const SOLID_RING_COLORS = ['#ff0040', '#ff8000', '#00ff80', '#00b0ff', '#ff0040'];
 const DISC_COLORS = ['#ff0040', '#ff8000', '#ffe000', '#00ff80', '#00b0ff', '#a040ff', '#ff0040'];
 const COLLAPSE_QUAD_COLORS = ['#EA4335', '#4285F4', '#34A853', '#FBBC05'] as const;
@@ -64,6 +64,72 @@ function traceRoundedRectPath(
   ctx.closePath();
 }
 
+function getSquareTrackCornerRadius(outerHalf: number, half: number) {
+  const inset = outerHalf - half;
+  if (inset <= 0) return SQUARE_CORNER_RADIUS + Math.abs(inset);
+  return Math.max(Math.min(SQUARE_CORNER_RADIUS - inset, half), 0);
+}
+
+function getRoundRectTrackPoint(cx: number, cy: number, half: number, radius: number, t: number) {
+  const r = Math.min(radius, half);
+  const edgeLen = half * 2 - r * 2;
+  const arcLen = (Math.PI / 2) * r;
+  const totalPerim = 4 * edgeLen + 4 * arcLen;
+  let d = wrapUnit(t) * totalPerim;
+
+  if (d < edgeLen) return { x: cx - half + r + d, y: cy - half };
+  d -= edgeLen;
+  if (d < arcLen) {
+    const a = -Math.PI / 2 + d / r;
+    return { x: cx + half - r + Math.cos(a) * r, y: cy - half + r + Math.sin(a) * r };
+  }
+  d -= arcLen;
+  if (d < edgeLen) return { x: cx + half, y: cy - half + r + d };
+  d -= edgeLen;
+  if (d < arcLen) {
+    const a = d / r;
+    return { x: cx + half - r + Math.cos(a) * r, y: cy + half - r + Math.sin(a) * r };
+  }
+  d -= arcLen;
+  if (d < edgeLen) return { x: cx + half - r - d, y: cy + half };
+  d -= edgeLen;
+  if (d < arcLen) {
+    const a = Math.PI / 2 + d / r;
+    return { x: cx - half + r + Math.cos(a) * r, y: cy + half - r + Math.sin(a) * r };
+  }
+  d -= arcLen;
+  if (d < edgeLen) return { x: cx - half, y: cy + half - r - d };
+  d -= edgeLen;
+  if (d < arcLen) {
+    const a = Math.PI + d / r;
+    return { x: cx - half + r + Math.cos(a) * r, y: cy - half + r + Math.sin(a) * r };
+  }
+
+  return { x: cx - half + r, y: cy - half };
+}
+
+function traceRoundRectTrackSegment(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  half: number,
+  radius: number,
+  startT: number,
+  endT: number,
+) {
+  let from = wrapUnit(startT);
+  let to = endT;
+  while (to < from) to += 1;
+  const steps = Math.max(5, Math.ceil((to - from) * 120));
+  const first = getRoundRectTrackPoint(cx, cy, half, radius, from);
+  ctx.moveTo(first.x, first.y);
+  for (let i = 1; i <= steps; i++) {
+    const t = from + ((to - from) * i) / steps;
+    const point = getRoundRectTrackPoint(cx, cy, half, radius, t);
+    ctx.lineTo(point.x, point.y);
+  }
+}
+
 function clipShapePath(ctx: CanvasRenderingContext2D, shape: CropShape, width: number, height: number) {
   if (shape === 'circle') {
     ctx.beginPath();
@@ -117,6 +183,11 @@ function lerpHexColor(a: string, b: string, t: number) {
   const g = Math.round(c1.g + (c2.g - c1.g) * t);
   const bValue = Math.round(c1.b + (c2.b - c1.b) * t);
   return `rgb(${r}, ${g}, ${bValue})`;
+}
+
+function rgbaHexColor(hex: string, alpha: number) {
+  const color = hexToRgb(hex);
+  return `rgba(${color.r}, ${color.g}, ${color.b}, ${clampNumber(alpha, 0, 1)})`;
 }
 
 function shadeHexColor(hex: string, amount: number) {
@@ -206,6 +277,19 @@ function drawLinxuDo(
   ctx.restore();
 }
 
+function fillCircle(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  radius: number,
+  fillStyle: string,
+) {
+  ctx.beginPath();
+  ctx.arc(x, y, radius, 0, Math.PI * 2);
+  ctx.fillStyle = fillStyle;
+  ctx.fill();
+}
+
 function drawCollapseQuadRing(
   ctx: CanvasRenderingContext2D,
   width: number,
@@ -254,6 +338,114 @@ function drawCollapseQuadRing(
     ctx.stroke();
   }
 
+  ctx.restore();
+}
+
+function drawLoader(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  shape: CropShape,
+  params: EffectParams,
+  progress: number,
+) {
+  const cx = width / 2;
+  const cy = height / 2;
+  const size = Math.min(width, height);
+  const dotCount = 3 + Math.floor(params.intensity / 25);
+  const orbitRadius = size * 0.25;
+  const outerHalf = size / 2;
+  const orbitHalf = Math.max(Math.min(orbitRadius, outerHalf - 12), 8);
+  const phase = wrapUnit(progress) * Math.PI * 2;
+
+  ctx.save();
+  clipShapePath(ctx, shape, width, height);
+  ctx.clip();
+
+  const centerAlpha = 0.06 + 0.04 * Math.sin(phase * 2);
+  fillCircle(ctx, cx, cy, size * 0.08, rgbaHexColor(params.color, centerAlpha));
+
+  if (shape === 'circle') {
+    ctx.beginPath();
+    ctx.arc(cx, cy, orbitRadius, 0, Math.PI * 2);
+    ctx.strokeStyle = rgbaHexColor(params.color, 0.08);
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  } else {
+    const cornerRadius = getSquareTrackCornerRadius(outerHalf, orbitHalf);
+    traceRoundedRectPath(ctx, cx - orbitHalf, cy - orbitHalf, orbitHalf * 2, orbitHalf * 2, cornerRadius);
+    ctx.strokeStyle = rgbaHexColor(params.color, 0.08);
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+
+  for (let index = 0; index < dotCount; index++) {
+    const dotPhase = phase - (index / dotCount) * Math.PI * 0.5;
+    const eased = dotPhase + Math.sin(dotPhase * 2) * 0.3;
+    const color = index === 0 ? params.color : params.secondaryColor;
+    const pulse = 0.7 + 0.3 * Math.sin(phase * 2 + index);
+    const dotSize = (3 + Math.sin(index) * 1.5) * pulse;
+    const alpha = 0.4 + 0.6 * (0.5 + 0.5 * Math.sin(phase + index * 0.8));
+    let x: number;
+    let y: number;
+
+    if (shape === 'circle') {
+      x = cx + Math.cos(eased) * orbitRadius;
+      y = cy + Math.sin(eased) * orbitRadius;
+    } else {
+      const trackT = wrapUnit(eased / (Math.PI * 2));
+      const cornerRadius = getSquareTrackCornerRadius(outerHalf, orbitHalf);
+      const point = getRoundRectTrackPoint(cx, cy, orbitHalf, cornerRadius, trackT);
+      x = point.x;
+      y = point.y;
+    }
+
+    fillCircle(ctx, x, y, dotSize * 3, rgbaHexColor(color, alpha * 0.12));
+    fillCircle(ctx, x, y, dotSize, rgbaHexColor(color, alpha));
+    fillCircle(ctx, x, y, dotSize * 0.4, `rgba(255, 255, 255, ${alpha * 0.7})`);
+  }
+
+  ctx.restore();
+}
+
+function drawSpinner(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  shape: CropShape,
+  params: EffectParams,
+  progress: number,
+) {
+  const cx = width / 2;
+  const cy = height / 2;
+  const size = Math.min(width, height);
+  const outerHalf = size / 2;
+  const radius = size * 0.28;
+  const strokeWidth = 6 + (params.intensity / 100) * 20;
+  const minArc = 0.14;
+  const maxArc = 0.4;
+  const phase = wrapUnit(progress);
+  const pulse = (Math.sin(phase * Math.PI * 2) + 1) / 2;
+  const arcLen = minArc + (maxArc - minArc) * pulse;
+  const startT = phase - arcLen * 0.82;
+  const endT = phase + arcLen * 0.18;
+
+  ctx.save();
+  clipShapePath(ctx, shape, width, height);
+  ctx.clip();
+  ctx.lineWidth = strokeWidth;
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = rgbaHexColor(params.color, 0.98);
+
+  ctx.beginPath();
+  if (shape === 'circle') {
+    ctx.arc(cx, cy, radius, startT * Math.PI * 2, endT * Math.PI * 2);
+  } else {
+    const half = Math.max(Math.min(radius, outerHalf - strokeWidth), 10);
+    const cornerRadius = getSquareTrackCornerRadius(outerHalf, half);
+    traceRoundRectTrackSegment(ctx, cx, cy, half, cornerRadius, startT, endT);
+  }
+  ctx.stroke();
   ctx.restore();
 }
 
@@ -760,6 +952,16 @@ export function createRingRenderer({
             ctx.restore();
           }
         }
+      }
+
+      if (effect === 'loader') {
+        drawLoader(ctx, width, height, shape, params, progress);
+        return;
+      }
+
+      if (effect === 'spinner') {
+        drawSpinner(ctx, width, height, shape, params, progress);
+        return;
       }
 
       const animation = getRingAnimationState(params, progress);
