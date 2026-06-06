@@ -281,7 +281,7 @@ function App() {
     const fps = 20;
     const mimeType = getSupportedWebMMimeType();
 
-    if (effect === 'axisrings') {
+    if (RING_EFFECTS.has(effect)) {
       const { frameCount, frameDelay } = getRingExportTiming(effect, fps, params);
       const frameCanvas = document.createElement('canvas');
       frameCanvas.width = canvas.width;
