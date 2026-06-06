@@ -1131,27 +1131,30 @@ export class ParticleEngine {
     if (this.shieldHitTimer > 0) this.shieldHitTimer -= 0.02 * speedStep;
 
     const cx = cw / 2, cy = ch / 2;
-    const segCount = Math.floor(this.params.density * 1.5) + 20;
+    const intensity = this.params.intensity / 100;
+    const segCount = Math.floor(this.params.density * (1.1 + intensity * 0.8)) + 20;
     const outerHalf = sz / 2;
 
     while (this.particles.length < segCount) {
       const angle = this.shape === 'circle' ? Math.random() * Math.PI * 2 : Math.random();
       const ring = Math.floor(Math.random() * 3);
       const baseR = this.shape === 'circle' ? sz / 2 - 15 + ring * 10 : sz / 2 - 32 + ring * 10;
-      const isArc = Math.random() < 0.2;
+      const isArc = Math.random() < 0.12 + intensity * 0.18;
 
       this.particles.push({
         x: 0, y: 0,
         vx: 0, vy: 0,
         angle,
         radius: baseR + (Math.random() - 0.5) * 5,
-        angularSpeed: (0.01 + Math.random() * 0.02) * (ring % 2 === 0 ? 1 : -1),
+        angularSpeed: (0.007 + intensity * 0.01 + Math.random() * (0.012 + intensity * 0.018)) * (ring % 2 === 0 ? 1 : -1),
         orbitLayer: ring,
         life: isArc ? 10 + Math.random() * 20 : 400 + Math.random() * 300,
         maxLife: isArc ? 30 : 700,
-        size: isArc ? 1 + Math.random() * 2 : 1.5 + Math.random() * 2.5,
+        size: isArc
+          ? 0.8 + intensity * 1.8 + Math.random() * 2
+          : 1.1 + intensity * 1.6 + Math.random() * 2.5,
         color: ring === 0 ? this.params.color : ring === 1 ? this.params.secondaryColor : this.params.color,
-        alpha: isArc ? 0.9 : 0.5 + Math.random() * 0.3,
+        alpha: isArc ? 0.55 + intensity * 0.4 : 0.32 + intensity * 0.35 + Math.random() * 0.25,
         flowOffset: Math.random() * Math.PI * 2,
         trail: isArc ? [] : undefined,
       });
@@ -1185,7 +1188,7 @@ export class ParticleEngine {
       return p.life > 0;
     });
 
-    if (Math.random() < 0.003) {
+    if (Math.random() < 0.0015 + intensity * 0.003) {
       this.shieldHitTimer = 1;
     }
   }
@@ -1197,16 +1200,17 @@ export class ParticleEngine {
     const flowAngle = this.shieldPhase * 0.5;
     const flowT = (((flowAngle / (Math.PI * 2)) % 1) + 1) % 1;
     const time = this.shieldPhase;
+    const intensity = this.params.intensity / 100;
     const colorNum = hexToNum(this.params.color);
     const secColorNum = hexToNum(this.params.secondaryColor);
 
     // Outer glow
-    const outerAlpha = 0.6 + Math.sin(time * 2) * 0.2;
+    const outerAlpha = 0.38 + intensity * 0.48 + Math.sin(time * 2) * (0.1 + intensity * 0.14);
     const glowSteps = 8;
     for (let i = glowSteps; i >= 0; i--) {
       const t = i / glowSteps;
-      const radius = (baseR - 5) + (baseR + 50 - (baseR - 5)) * t;
-      const alpha = outerAlpha * (1 - t) * 0.1;
+      const radius = (baseR - 5) + (baseR + 34 + intensity * 34 - (baseR - 5)) * t;
+      const alpha = outerAlpha * (1 - t) * (0.055 + intensity * 0.07);
       if (this.shape === 'circle') {
         g.circle(cx, cy, radius).fill({ color: colorNum, alpha });
       } else {
@@ -1217,9 +1221,9 @@ export class ParticleEngine {
 
     // 3-layer shield rings
     const ringConfigs = [
-      { r: baseR + 6,  alpha: 0.1,  color: colorNum },
-      { r: baseR + 16, alpha: 0.15, color: secColorNum },
-      { r: baseR + 26, alpha: 0.2,  color: colorNum },
+      { r: baseR + 6,  alpha: 0.06 + intensity * 0.09, color: colorNum },
+      { r: baseR + 16, alpha: 0.08 + intensity * 0.13, color: secColorNum },
+      { r: baseR + 26, alpha: 0.1 + intensity * 0.16,  color: colorNum },
     ];
 
     const arcSteps = 64;
@@ -1232,23 +1236,23 @@ export class ParticleEngine {
           g.lineTo(cx + Math.cos(a) * ring.r, cy + Math.sin(a) * ring.r);
         }
         g.closePath();
-        g.stroke({ width: 1.5, color: ring.color, alpha: ringAlpha });
+        g.stroke({ width: 0.9 + intensity * 1.4, color: ring.color, alpha: ringAlpha });
       } else {
         const cornerRadius = getSquareTrackCornerRadius(outerHalf, ring.r);
         g.roundRect(cx - ring.r, cy - ring.r, ring.r * 2, ring.r * 2, cornerRadius);
-        g.stroke({ width: 1.5, color: ring.color, alpha: ringAlpha });
+        g.stroke({ width: 0.9 + intensity * 1.4, color: ring.color, alpha: ringAlpha });
       }
     }
 
     // Flowing bright arc segments
-    const arcCount = 7;
+    const arcCount = 4 + Math.round(intensity * 6);
     for (let i = 0; i < arcCount; i++) {
       const ringIdx = i % 3;
       const ring = ringConfigs[ringIdx];
       const baseAngle = (i / arcCount) * Math.PI * 2;
       const arcStart = baseAngle + time * (0.3 + ringIdx * 0.12);
-      const arcLen = 0.25 + Math.sin(time * 1.5 + i * 0.8) * 0.1;
-      const arcAlpha = 0.6 + Math.sin(time * 2 + i * 1.2) * 0.2;
+      const arcLen = 0.16 + intensity * 0.18 + Math.sin(time * 1.5 + i * 0.8) * (0.06 + intensity * 0.08);
+      const arcAlpha = 0.34 + intensity * 0.46 + Math.sin(time * 2 + i * 1.2) * (0.1 + intensity * 0.12);
       const arcColor = i % 2 === 0 ? 0xffffff : ring.color;
 
       if (this.shape === 'circle') {
@@ -1261,13 +1265,13 @@ export class ParticleEngine {
           const a = arcStart + (arcLen * s) / steps;
           g.lineTo(cx + Math.cos(a) * ring.r, cy + Math.sin(a) * ring.r);
         }
-        g.stroke({ width: 2.5, color: arcColor, alpha: arcAlpha });
+        g.stroke({ width: 1.4 + intensity * 2.2, color: arcColor, alpha: arcAlpha });
       } else {
         const cornerRadius = getSquareTrackCornerRadius(outerHalf, ring.r);
         const arcStartT = ((i / arcCount) + (time * (0.3 + ringIdx * 0.12)) / (Math.PI * 2)) % 1;
         const arcLenT = arcLen / (Math.PI * 2);
         this.drawRoundRectSegment(g, cx, cy, ring.r, cornerRadius, arcStartT, arcStartT + arcLenT, {
-          width: 2.5,
+          width: 1.4 + intensity * 2.2,
           color: arcColor,
           alpha: arcAlpha,
         });
@@ -1278,7 +1282,7 @@ export class ParticleEngine {
     if (this.shape === 'circle') {
       const hexSize = 14;
       const hexR = baseR + 16;
-      const hexPulse = 0.14 + Math.sin(time * 3) * 0.06;
+      const hexPulse = 0.06 + intensity * 0.14 + Math.sin(time * 3) * (0.03 + intensity * 0.05);
 
       for (let row = -4; row <= 4; row++) {
         for (let col = -4; col <= 4; col++) {
@@ -1291,7 +1295,7 @@ export class ParticleEngine {
           const flowDist = Math.abs(((cellAngle - flowAngle + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
           const flowBright = flowDist < 0.8 ? 1 - flowDist / 0.8 : 0;
 
-          const hexAlpha = hexPulse + flowBright * 0.15;
+          const hexAlpha = hexPulse + flowBright * (0.08 + intensity * 0.14);
           const centerX = cx + hx;
           const centerY = cy + hy;
           const hexR2 = hexSize * 0.5;
@@ -1304,7 +1308,7 @@ export class ParticleEngine {
             g.lineTo(centerX + Math.cos(va) * hexR2, centerY + Math.sin(va) * hexR2);
           }
           g.closePath();
-          g.stroke({ width: 0.6, color: colorNum, alpha: hexAlpha });
+          g.stroke({ width: 0.35 + intensity * 0.55, color: colorNum, alpha: hexAlpha });
         }
       }
     }
@@ -1336,9 +1340,9 @@ export class ParticleEngine {
       const flowMod = flowProx < 1 ? 1 + (1 - flowProx) * 0.5 : 1;
 
       // Outer glow
-      g.circle(p.x, p.y, p.size * 2).fill({ color: pColor, alpha: Math.min(1, a * flowMod * 0.2) });
+      g.circle(p.x, p.y, p.size * (1.5 + intensity * 1.5)).fill({ color: pColor, alpha: Math.min(1, a * flowMod * (0.1 + intensity * 0.18)) });
       // Core
-      g.circle(p.x, p.y, p.size).fill({ color: pColor, alpha: Math.min(1, a * flowMod) });
+      g.circle(p.x, p.y, p.size).fill({ color: pColor, alpha: Math.min(1, a * flowMod * (0.62 + intensity * 0.42)) });
 
       if (!isArc) {
         g.circle(p.x, p.y, p.size * 0.3).fill({ color: 0xffffff, alpha: a * flowMod * 0.5 });
@@ -1351,7 +1355,7 @@ export class ParticleEngine {
       for (let i = hitSteps; i >= 0; i--) {
         const t = i / hitSteps;
         const radius = (baseR - 10) + (baseR + 30 - (baseR - 10)) * t;
-        const alpha = this.shieldHitTimer * 0.3 * (1 - t) * 0.3;
+        const alpha = this.shieldHitTimer * (0.16 + intensity * 0.28) * (1 - t) * 0.3;
         if (this.shape === 'circle') {
           g.circle(cx, cy, radius).fill({ color: 0xffffff, alpha });
         } else {
@@ -2570,8 +2574,13 @@ export class ParticleEngine {
     const speedStep = this.getSpeedStep();
     this.bubbleTime += 0.016 * speedStep;
     const cx = cw / 2, cy = ch / 2, r = sz / 2;
+    const intensity = this.params.intensity / 100;
     const warmup = Math.min(1, this.bubbleTime / 2);
-    const targetCount = Math.floor((this.params.density * 1.5 + 20) * warmup);
+    const targetCount = Math.floor((this.params.density * (1.05 + intensity * 0.9) + 16 + intensity * 18) * warmup);
+
+    if (this.particles.length > targetCount) {
+      this.particles.length = targetCount;
+    }
 
     while (this.particles.length < targetCount) {
       const spawn = this.shape === 'circle'
@@ -2583,21 +2592,21 @@ export class ParticleEngine {
         vx: 0, vy: 0,
         life: 200 + Math.random() * 300,
         maxLife: 500,
-        size: 3 + Math.random() * 6,
+        size: 2.2 + intensity * 4.2 + Math.random() * (4 + intensity * 4.5),
         color: Math.random() > 0.5 ? this.params.color : this.params.secondaryColor,
-        alpha: 0.3 + Math.random() * 0.4,
+        alpha: 0.18 + intensity * 0.32 + Math.random() * (0.24 + intensity * 0.18),
         swayPhase: Math.random() * Math.PI * 2,
-        swaySpeed: 1 + Math.random() * 2,
+        swaySpeed: 0.75 + intensity * 1.1 + Math.random() * (1.3 + intensity * 1.4),
       });
     }
 
     this.particles = this.particles.filter(p => {
       // Rise
-      p.y -= (0.5 + Math.random() * 0.3) * speedStep;
+      p.y -= (0.35 + intensity * 0.55 + Math.random() * (0.22 + intensity * 0.28)) * speedStep;
       // Sway
-      p.x += Math.sin(this.bubbleTime * (p.swaySpeed ?? 1) + (p.swayPhase ?? 0)) * 0.5 * speedStep;
+      p.x += Math.sin(this.bubbleTime * (p.swaySpeed ?? 1) + (p.swayPhase ?? 0)) * (0.35 + intensity * 0.55) * speedStep;
       // Slight shrink as it rises
-      p.size *= Math.pow(0.9995, speedStep);
+      p.size *= Math.pow(0.9992 - intensity * 0.00025, speedStep);
       p.life -= speedStep;
       if (!this.isInsideShapePoint(p.x, p.y, cx, cy, r, -p.size)) {
         p.life = 0;
@@ -2608,18 +2617,20 @@ export class ParticleEngine {
   }
 
   private drawBubble(g: PIXI.Graphics, _cw: number, _ch: number, _sz: number) {
+    const intensity = this.params.intensity / 100;
 
     for (const p of this.particles) {
       const lifeRatio = p.life / p.maxLife;
       const a = p.alpha * Math.min(1, lifeRatio * 3);
       const pColor = hexToNum(p.color);
 
+      g.circle(p.x, p.y, p.size * (1.7 + intensity * 2.4)).fill({ color: pColor, alpha: a * (0.035 + intensity * 0.07) });
       // Bubble rim
-      g.circle(p.x, p.y, p.size).stroke({ color: pColor, alpha: a * 0.7, width: 1.5 });
+      g.circle(p.x, p.y, p.size).stroke({ color: pColor, alpha: a * (0.45 + intensity * 0.42), width: 0.9 + intensity * 1.4 });
       // Inner glow
-      g.circle(p.x, p.y, p.size * 0.7).fill({ color: pColor, alpha: a * 0.1 });
+      g.circle(p.x, p.y, p.size * 0.7).fill({ color: pColor, alpha: a * (0.06 + intensity * 0.13) });
       // Highlight
-      g.circle(p.x - p.size * 0.25, p.y - p.size * 0.25, p.size * 0.25).fill({ color: 0xffffff, alpha: a * 0.5 });
+      g.circle(p.x - p.size * 0.25, p.y - p.size * 0.25, p.size * (0.18 + intensity * 0.13)).fill({ color: 0xffffff, alpha: a * (0.32 + intensity * 0.36) });
     }
   }
 
@@ -2634,7 +2645,12 @@ export class ParticleEngine {
     const cx = cw / 2;
     const cy = ch / 2;
     const r = sz / 2;
-    const targetCount = Math.floor(this.params.density * 1.5) + 30;
+    const intensity = this.params.intensity / 100;
+    const targetCount = Math.floor(this.params.density * (1.0 + intensity * 0.85)) + 22 + Math.floor(intensity * 24);
+
+    if (this.particles.length > targetCount) {
+      this.particles.length = targetCount;
+    }
 
     while (this.particles.length < targetCount) {
       const x = this.shape === 'circle'
@@ -2648,22 +2664,22 @@ export class ParticleEngine {
         vx: 0, vy: 0,
         life: 300 + Math.random() * 500,
         maxLife: 800,
-        size: 34 + Math.random() * 52,
+        size: 24 + intensity * 36 + Math.random() * (34 + intensity * 36),
         color: Math.random() > 0.5 ? this.params.color : this.params.secondaryColor,
-        alpha: 0.04 + Math.random() * 0.06,
+        alpha: 0.025 + intensity * 0.07 + Math.random() * (0.035 + intensity * 0.045),
         swayPhase: Math.random() * Math.PI * 2 + band * Math.PI,
-        swaySpeed: 0.22 + Math.random() * 0.45,
+        swaySpeed: 0.16 + intensity * 0.2 + Math.random() * (0.3 + intensity * 0.35),
       });
     }
 
     this.particles = this.particles.filter(p => {
       const wave = Math.sin(this.auroraTime * (p.swaySpeed ?? 0.4) + (p.swayPhase ?? 0));
       const drift = Math.sin(this.auroraTime * 0.22 + (p.swayPhase ?? 0) * 0.7);
-      p.x += (wave * 0.85 + drift * 0.45) * speedStep;
-      p.y += Math.sin(this.auroraTime * 0.18 + (p.swayPhase ?? 0)) * 0.12 * speedStep;
+      p.x += (wave * (0.48 + intensity * 0.78) + drift * (0.28 + intensity * 0.42)) * speedStep;
+      p.y += Math.sin(this.auroraTime * (0.14 + intensity * 0.12) + (p.swayPhase ?? 0)) * (0.07 + intensity * 0.16) * speedStep;
       p.alpha = (
-        0.035
-        + 0.05 * (0.5 + 0.5 * Math.sin(this.auroraTime * 1.3 + (p.swayPhase ?? 0)))
+        0.018 + intensity * 0.035
+        + (0.026 + intensity * 0.06) * (0.5 + 0.5 * Math.sin(this.auroraTime * 1.3 + (p.swayPhase ?? 0)))
       ) * (p.life / (p.maxLife ?? 800));
       p.life -= speedStep;
       return p.life > 0;
@@ -2674,14 +2690,15 @@ export class ParticleEngine {
     const cx = cw / 2;
     const cy = ch / 2;
     const r = sz / 2;
-    const curtainCount = 4;
+    const intensity = this.params.intensity / 100;
+    const curtainCount = 3 + Math.round(intensity * 3);
     const segments = 28;
 
     for (let layer = 0; layer < curtainCount; layer++) {
       const layerT = curtainCount <= 1 ? 0 : layer / (curtainCount - 1);
       const yBase = cy - r * (0.74 - layerT * 0.11);
-      const thickness = r * (0.18 + layerT * 0.06);
-      const span = sz * (0.74 + layerT * 0.08);
+      const thickness = r * (0.12 + intensity * 0.12 + layerT * 0.06);
+      const span = sz * (0.66 + intensity * 0.14 + layerT * 0.08);
       const pointsTop: Array<{ x: number; y: number }> = [];
       const pointsBottom: Array<{ x: number; y: number }> = [];
       const layerColor = layer % 2 === 0 ? hexToNum(this.params.color) : hexToNum(this.params.secondaryColor);
@@ -2690,8 +2707,8 @@ export class ParticleEngine {
         const t = i / segments;
         const x = cx - span / 2 + span * t;
         const sway =
-          Math.sin(this.auroraTime * (0.5 + layer * 0.08) + t * Math.PI * (2.4 + layer * 0.35) + layer * 1.15) * (10 + layer * 5) +
-          Math.sin(this.auroraTime * 0.85 + t * Math.PI * 5.2 + layer * 0.6) * 5;
+          Math.sin(this.auroraTime * (0.42 + intensity * 0.35 + layer * 0.08) + t * Math.PI * (2.4 + layer * 0.35) + layer * 1.15) * (6 + intensity * 10 + layer * 5) +
+          Math.sin(this.auroraTime * (0.66 + intensity * 0.4) + t * Math.PI * 5.2 + layer * 0.6) * (3 + intensity * 5);
         const taper = 0.55 + 0.45 * Math.sin(t * Math.PI);
         const crest = yBase + sway * 0.32;
         pointsTop.push({ x, y: crest - thickness * taper * 0.52 });
@@ -2706,12 +2723,12 @@ export class ParticleEngine {
         g.lineTo(pointsBottom[i].x, pointsBottom[i].y);
       }
       g.closePath();
-      g.fill({ color: layerColor, alpha: 0.038 + layerT * 0.018 });
+      g.fill({ color: layerColor, alpha: 0.02 + intensity * 0.045 + layerT * (0.012 + intensity * 0.018) });
     }
 
     for (const p of this.particles) {
       const pColor = hexToNum(p.color);
-      const stretch = 0.2 + 0.08 * Math.sin(this.auroraTime + (p.swayPhase ?? 0));
+      const stretch = 0.16 + intensity * 0.1 + 0.08 * Math.sin(this.auroraTime + (p.swayPhase ?? 0));
       g.ellipse(p.x, p.y, p.size, p.size * stretch).fill({ color: pColor, alpha: p.alpha });
     }
   }
@@ -2724,34 +2741,39 @@ export class ParticleEngine {
     const speedStep = this.getSpeedStep();
     this.fireflyTime += 0.016 * speedStep;
     const cx = cw / 2, cy = ch / 2, r = sz / 2;
-    const targetCount = Math.floor(this.params.density * 0.8) + 15;
+    const intensity = this.params.intensity / 100;
+    const targetCount = Math.floor(this.params.density * (0.52 + intensity * 0.72)) + 10 + Math.floor(intensity * 16);
+
+    if (this.particles.length > targetCount) {
+      this.particles.length = targetCount;
+    }
 
     while (this.particles.length < targetCount) {
       const spawn = this.getRandomPointInShape(cx, cy, r, r * 0.1);
       this.particles.push({
         x: spawn.x,
         y: spawn.y,
-        vx: (Math.random() - 0.5) * 0.3,
-        vy: (Math.random() - 0.5) * 0.3,
+        vx: (Math.random() - 0.5) * (0.18 + intensity * 0.35),
+        vy: (Math.random() - 0.5) * (0.18 + intensity * 0.35),
         life: 400 + Math.random() * 600,
         maxLife: 1000,
-        size: 2 + Math.random() * 3,
+        size: 1.3 + intensity * 2.5 + Math.random() * (2.0 + intensity * 2.2),
         color: Math.random() > 0.4 ? this.params.color : this.params.secondaryColor,
         alpha: 0,
-        flickerSpeed: 1 + Math.random() * 3,
+        flickerSpeed: 0.8 + intensity * 2 + Math.random() * (2.2 + intensity * 2.4),
         flickerPhase: Math.random() * Math.PI * 2,
         swayPhase: Math.random() * Math.PI * 2,
-        swaySpeed: 0.5 + Math.random() * 1.5,
+        swaySpeed: 0.4 + intensity * 0.9 + Math.random() * (1.1 + intensity * 1.1),
       });
     }
 
     this.particles = this.particles.filter(p => {
-      p.vx += (Math.random() - 0.5) * 0.05 * speedStep;
-      p.vy += (Math.random() - 0.5) * 0.05 * speedStep;
+      p.vx += (Math.random() - 0.5) * (0.025 + intensity * 0.06) * speedStep;
+      p.vy += (Math.random() - 0.5) * (0.025 + intensity * 0.06) * speedStep;
       p.vx *= Math.pow(0.98, speedStep);
       p.vy *= Math.pow(0.98, speedStep);
-      p.x += (p.vx + Math.sin(this.fireflyTime * (p.swaySpeed ?? 1) + (p.swayPhase ?? 0)) * 0.2) * speedStep;
-      p.y += (p.vy + Math.cos(this.fireflyTime * (p.swaySpeed ?? 1) + (p.swayPhase ?? 0)) * 0.15) * speedStep;
+      p.x += (p.vx + Math.sin(this.fireflyTime * (p.swaySpeed ?? 1) + (p.swayPhase ?? 0)) * (0.12 + intensity * 0.24)) * speedStep;
+      p.y += (p.vy + Math.cos(this.fireflyTime * (p.swaySpeed ?? 1) + (p.swayPhase ?? 0)) * (0.08 + intensity * 0.2)) * speedStep;
 
       if (!this.isInsideShapePoint(p.x, p.y, cx, cy, r, r * 0.08)) {
         const projected = this.projectInsideShapePoint(p.x, p.y, cx, cy, r, r * 0.08);
@@ -2761,11 +2783,12 @@ export class ParticleEngine {
         p.y = projected.y;
       }
 
-      const flicker = 0.3 + 0.7 * Math.abs(Math.sin(this.fireflyTime * (p.flickerSpeed ?? 2) + (p.flickerPhase ?? 0)));
+      const flickerFloor = 0.18 + intensity * 0.18;
+      const flicker = flickerFloor + (1 - flickerFloor) * Math.abs(Math.sin(this.fireflyTime * (p.flickerSpeed ?? 2) + (p.flickerPhase ?? 0)));
       const lifeRatio = p.life / (p.maxLife ?? 1000);
       const fadeIn = lifeRatio > 0.9 ? (1 - lifeRatio) / 0.1 : 1;
       const fadeOut = lifeRatio < 0.1 ? lifeRatio / 0.1 : 1;
-      p.alpha = flicker * fadeIn * fadeOut;
+      p.alpha = flicker * fadeIn * fadeOut * (0.55 + intensity * 0.5);
 
       p.life -= speedStep;
       return p.life > 0;
@@ -2773,12 +2796,14 @@ export class ParticleEngine {
   }
 
   private drawFirefly(g: PIXI.Graphics, _cw: number, _ch: number, _sz: number) {
+    const intensity = this.params.intensity / 100;
+
     for (const p of this.particles) {
       const pColor = hexToNum(p.color);
-      g.circle(p.x, p.y, p.size * 4).fill({ color: pColor, alpha: p.alpha * 0.08 });
-      g.circle(p.x, p.y, p.size * 2).fill({ color: pColor, alpha: p.alpha * 0.2 });
-      g.circle(p.x, p.y, p.size).fill({ color: pColor, alpha: p.alpha * 0.7 });
-      g.circle(p.x, p.y, p.size * 0.3).fill({ color: 0xffffff, alpha: p.alpha * 0.9 });
+      g.circle(p.x, p.y, p.size * (3.0 + intensity * 3.4)).fill({ color: pColor, alpha: p.alpha * (0.045 + intensity * 0.08) });
+      g.circle(p.x, p.y, p.size * (1.6 + intensity * 0.9)).fill({ color: pColor, alpha: p.alpha * (0.14 + intensity * 0.16) });
+      g.circle(p.x, p.y, p.size).fill({ color: pColor, alpha: p.alpha * (0.48 + intensity * 0.34) });
+      g.circle(p.x, p.y, p.size * 0.3).fill({ color: 0xffffff, alpha: p.alpha * (0.58 + intensity * 0.34) });
     }
   }
 
@@ -2790,7 +2815,12 @@ export class ParticleEngine {
     const speedStep = this.getSpeedStep();
     this.rainTime += 0.016 * speedStep;
     const cx = cw / 2, cy = ch / 2, r = sz / 2;
-    const targetCount = Math.floor(this.params.density * 2) + 40;
+    const intensity = this.params.intensity / 100;
+    const targetCount = Math.floor(this.params.density * (1.25 + intensity * 1.25)) + 28 + Math.floor(intensity * 28);
+
+    if (this.particles.length > targetCount) {
+      this.particles.length = targetCount;
+    }
 
     while (this.particles.length < targetCount) {
       let x: number;
@@ -2805,13 +2835,13 @@ export class ParticleEngine {
       this.particles.push({
         x,
         y,
-        vx: (Math.random() - 0.5) * 0.3,
-        vy: 3 + Math.random() * 4,
+        vx: (Math.random() - 0.5) * (0.18 + intensity * 0.34),
+        vy: 2.1 + intensity * 2.7 + Math.random() * (2.8 + intensity * 3.2),
         life: 60 + Math.random() * 80,
         maxLife: 140,
-        size: 1 + Math.random() * 1.5,
+        size: 0.7 + intensity * 1.25 + Math.random() * (1.0 + intensity * 1.4),
         color: Math.random() > 0.3 ? this.params.color : this.params.secondaryColor,
-        alpha: 0.4 + Math.random() * 0.4,
+        alpha: 0.24 + intensity * 0.34 + Math.random() * (0.24 + intensity * 0.18),
         trail: [],
       });
     }
@@ -2823,7 +2853,7 @@ export class ParticleEngine {
       }
       p.x += p.vx * speedStep;
       p.y += p.vy * speedStep;
-      p.vy += 0.05 * speedStep;
+      p.vy += (0.025 + intensity * 0.055) * speedStep;
 
       if (this.shape === 'circle') {
         const dx = p.x - cx, dy = p.y - cy;
@@ -2842,16 +2872,19 @@ export class ParticleEngine {
   }
 
   private drawRain(g: PIXI.Graphics, _cw: number, _ch: number, _sz: number) {
+    const intensity = this.params.intensity / 100;
+
     for (const p of this.particles) {
       const lifeRatio = p.life / (p.maxLife ?? 140);
       const a = p.alpha * Math.min(1, lifeRatio * 3);
       const pColor = hexToNum(p.color);
+      const trailScale = 0.42 + intensity * 0.55;
 
       g.moveTo(p.x, p.y);
-      g.lineTo(p.x - p.vx * 0.5, p.y - p.vy * 0.5);
-      g.stroke({ color: pColor, alpha: a, width: p.size });
+      g.lineTo(p.x - p.vx * trailScale, p.y - p.vy * trailScale);
+      g.stroke({ color: pColor, alpha: a * (0.72 + intensity * 0.32), width: p.size });
 
-      g.circle(p.x, p.y, p.size * 2).fill({ color: pColor, alpha: a * 0.15 });
+      g.circle(p.x, p.y, p.size * (1.5 + intensity * 2.4)).fill({ color: pColor, alpha: a * (0.08 + intensity * 0.13) });
     }
   }
   // ════════════════════════════════════════════════════════════════════

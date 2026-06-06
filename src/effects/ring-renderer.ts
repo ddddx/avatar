@@ -540,6 +540,20 @@ function drawSpinner(
   ctx.clip();
   ctx.lineWidth = strokeWidth;
   ctx.lineCap = 'round';
+
+  ctx.beginPath();
+  if (shape === 'circle') {
+    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+  } else {
+    const half = Math.max(Math.min(radius, outerHalf - strokeWidth), 10);
+    const cornerRadius = getSquareTrackCornerRadius(outerHalf, half);
+    traceRoundedRectPath(ctx, cx - half, cy - half, half * 2, half * 2, cornerRadius);
+  }
+  ctx.strokeStyle = rgbaHexColor(params.secondaryColor, 0.12 + (params.intensity / 100) * 0.16);
+  ctx.lineWidth = Math.max(2, strokeWidth * 0.38);
+  ctx.stroke();
+
+  ctx.lineWidth = strokeWidth;
   ctx.strokeStyle = rgbaHexColor(params.color, 0.98);
 
   ctx.beginPath();
