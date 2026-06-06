@@ -33,6 +33,11 @@ function mixHex(a: string, b: string, t: number): string {
   return `#${lerpColor(a, b, t).toString(16).padStart(6, '0')}`;
 }
 
+function pseudoRandom(seed: number) {
+  const value = Math.sin(seed * 12.9898) * 43758.5453;
+  return value - Math.floor(value);
+}
+
 function drawRingQuad(
   g: PIXI.Graphics,
   p1Outer: { x: number; y: number },
@@ -204,6 +209,9 @@ export class ParticleEngine {
   // Bubble state
   private bubbleTime = 0;
 
+  // Fire state
+  private fireTime = 0;
+
   // Aurora state
   private auroraTime = 0;
 
@@ -222,6 +230,7 @@ export class ParticleEngine {
 
   // Google One ring state
   private googleOnePhase = 0;
+  private effectLoopPhase: number | null = null;
   private frameDeltaSeconds = 1 / 60;
   private lastUpdateAt = 0;
   private fixedDeltaSeconds: number | null = null;
@@ -245,16 +254,28 @@ export class ParticleEngine {
     this.lastUpdateAt = 0;
   }
   setRingLoopProgress(progress: number | null) {
-    if (progress == null) return;
+    if (progress == null) {
+      this.effectLoopPhase = null;
+      return;
+    }
     const direction = this.params.direction === 'reverse' ? -1 : 1;
-    const phase = this.getWrappedPhase(progress * direction);
-    this.solidRingPhase = phase;
-    this.discPhase = phase;
-    this.googleOnePhase = phase;
+    const loopPhase = this.getWrappedPhase(progress);
+    const ringPhase = this.getWrappedPhase(progress * direction);
+    this.effectLoopPhase = loopPhase;
+    this.solidRingPhase = ringPhase;
+    this.discPhase = ringPhase;
+    this.googleOnePhase = ringPhase;
   }
 
   private getSpeedStep() {
     return Math.max(this.params.speed / 50, 0.02);
+  }
+
+  private getEffectLoopProgress(timer: number, realtimeScale: number) {
+    if (this.effectLoopPhase != null) {
+      return this.effectLoopPhase;
+    }
+    return this.getWrappedPhase(timer * realtimeScale);
   }
 
   update(canvasW: number, canvasH: number, imgSize: number) {
@@ -698,146 +719,93 @@ export class ParticleEngine {
   // 🔥 FIRE
   // ════════════════════════════════════════════════════════════════════
 
-  private updateFire(cw: number, ch: number, sz: number) {
-    const speedStep = this.getSpeedStep();
-    const spd = speedStep;
-    const intensity = this.params.intensity / 100;
-    const spawnRate = Math.floor(this.params.density / 5) + 4 + Math.floor(intensity * 5);
-    const cx = cw / 2, cy = ch / 2, r = sz / 2;
-    const baseY = cy + r * 0.88;
-    const plumeWidth = r * (0.42 + intensity * 0.26);
-    const maxParticles = Math.floor(this.params.density * (1.8 + intensity * 1.2)) + 70;
-
-    for (let i = 0; i < spawnRate; i++) {
-      const lane = (Math.random() + Math.random() - 1);
-      const centerPull = 1 - Math.min(Math.abs(lane), 1);
-      const isSpark = Math.random() < 0.12 + intensity * 0.18;
-      const x = cx + lane * plumeWidth + Math.sin(this.time * 7 + lane * 3) * r * 0.03;
-      const y = baseY + Math.random() * r * 0.14;
-      const lift = isSpark
-        ? 2.2 + intensity * 3.2 + Math.random() * 4.2
-        : 1.4 + centerPull * (1.8 + intensity * 2.8) + Math.random() * (1.1 + intensity * 1.7);
-
-      this.particles.push({
-        x,
-        y,
-        vx: lane * (0.16 + intensity * 0.32) + (Math.random() - 0.5) * (0.4 + intensity * 0.5),
-        vy: -lift * spd,
-        life: isSpark ? 42 + Math.random() * 34 : 36 + Math.random() * 42,
-        maxLife: isSpark ? 76 : 78,
-        size: isSpark
-          ? 0.8 + intensity * 1.8 + Math.random() * 2.2
-          : 6 + intensity * 7 + Math.random() * (7 + intensity * 8),
-        color: isSpark ? this.params.secondaryColor : this.params.color,
-        alpha: isSpark ? 0.62 + intensity * 0.32 : 0.42 + intensity * 0.32,
-        orbitLayer: isSpark ? 1 : 0,
-        swayPhase: Math.random() * Math.PI * 2,
-        swaySpeed: 1.4 + Math.random() * 2.4 + intensity * 1.2,
-        trail: [],
-      });
-    }
-
-    if (this.particles.length > maxParticles) {
-      this.particles.splice(0, this.particles.length - maxParticles);
-    }
-
-    this.particles = this.particles.filter(p => {
-      const age = 1 - p.life / p.maxLife;
-      if (p.trail) {
-        p.trail.push({ x: p.x, y: p.y, alpha: p.alpha, size: p.size });
-        if (p.trail.length > (p.orbitLayer === 1 ? 7 : 4)) p.trail.shift();
-      }
-      const inward = (cx - p.x) / Math.max(r, 1);
-      p.vx += (
-        inward * (0.018 + age * 0.035)
-        + Math.sin(this.time * (p.swaySpeed ?? 2) + (p.swayPhase ?? 0)) * (0.018 + intensity * 0.03)
-        + (Math.random() - 0.5) * (0.06 + intensity * 0.05)
-      ) * speedStep;
-      p.vy -= (p.orbitLayer === 1 ? 0.012 : 0.035 + intensity * 0.025) * speedStep;
-      p.x += (p.vx + Math.sin(this.time * 8 + (p.swayPhase ?? 0)) * (0.12 + intensity * 0.2) * age) * speedStep;
-      p.y += p.vy * speedStep;
-      p.vx *= Math.pow(0.985, speedStep);
-      p.vy *= Math.pow(0.992, speedStep);
-      p.size *= Math.pow(p.orbitLayer === 1 ? 0.992 : 0.978, speedStep);
-      p.life -= speedStep;
-      return p.life > 0 && p.size > 0.35 && p.y > cy - r * 1.12;
-    });
+  private updateFire(_cw: number, _ch: number, _sz: number) {
+    this.fireTime += this.frameDeltaSeconds * this.getSpeedStep() * 0.5;
+    this.particles = [];
   }
 
   private drawFire(g: PIXI.Graphics, cw: number, ch: number, sz: number) {
     const cx = cw / 2, cy = ch / 2, r = sz / 2;
     const intensity = this.params.intensity / 100;
+    const density = this.params.density / 100;
+    const phase = this.getEffectLoopProgress(this.fireTime, 1);
+    const loop = phase * Math.PI * 2;
     const mainColor = this.params.color;
     const secondaryColor = this.params.secondaryColor;
-    const midColor = mixHex(mainColor, secondaryColor, 0.45);
-    const emberColor = mixHex(mainColor, '#160300', 0.55);
-    const whiteHot = mixHex(secondaryColor, '#ffffff', 0.78);
+    const emberColor = mixHex(mainColor, '#160300', 0.58);
+    const whiteHot = mixHex(secondaryColor, '#ffffff', 0.72);
+    const baseY = cy + r * 0.88;
 
-    const baseY = cy + r * 0.9;
-    const glowSteps = 8;
-    for (let i = glowSteps; i >= 0; i--) {
-      const t = i / glowSteps;
-      const w = r * (0.36 + intensity * 0.18 + t * 0.68);
-      const h = r * (0.08 + intensity * 0.04 + t * 0.18);
-      const alpha = (0.04 + intensity * 0.06) * (1 - t);
-      g.ellipse(cx, baseY + r * 0.02, w, h).fill({ color: lerpColor(secondaryColor, mainColor, t), alpha });
+    for (let i = 7; i >= 0; i--) {
+      const t = i / 7;
+      const pulse = 0.9 + 0.1 * Math.sin(loop + t * Math.PI);
+      g.ellipse(
+        cx,
+        baseY + r * 0.02,
+        r * (0.38 + density * 0.18 + t * 0.52) * pulse,
+        r * (0.045 + intensity * 0.035 + t * 0.13),
+      ).fill({
+        color: lerpColor(secondaryColor, mainColor, t),
+        alpha: (0.035 + intensity * 0.065) * (1 - t),
+      });
     }
 
-    for (let layer = 0; layer < 4; layer++) {
-      const layerT = layer / 3;
-      const flameY = baseY - r * (0.14 + layerT * 0.48);
-      const sway = Math.sin(this.time * (2.1 + layer) + layer * 1.7) * r * (0.018 + intensity * 0.02);
-      const flameW = r * (0.46 - layerT * 0.23 + intensity * 0.08);
-      const flameH = r * (0.22 + layerT * 0.2 + intensity * 0.1);
-      const color = layer < 2 ? lerpColor(mainColor, secondaryColor, 0.25 + layerT * 0.35) : lerpColor(secondaryColor, whiteHot, layerT * 0.45);
-      g.ellipse(cx + sway, flameY, flameW, flameH).fill({ color, alpha: (0.045 + intensity * 0.05) * (1 - layerT * 0.35) });
+    const tongueCount = 8 + Math.floor(this.params.density / 13) + Math.floor(intensity * 4);
+    for (let i = 0; i < tongueCount; i++) {
+      const seed = pseudoRandom(i * 31.7 + 4.2);
+      const t = tongueCount <= 1 ? 0.5 : (i + 0.5) / tongueCount;
+      const lane = t * 2 - 1;
+      const edgeAngle = Math.PI * (0.12 + t * 0.76);
+      const baseX = this.shape === 'circle'
+        ? cx + Math.cos(edgeAngle) * r * (0.82 + seed * 0.08)
+        : cx + lane * r * 0.9;
+      const base = this.shape === 'circle'
+        ? cy + Math.sin(edgeAngle) * r * (0.84 + seed * 0.07)
+        : baseY + Math.sin((t + phase) * Math.PI * 2) * r * 0.015;
+      const edgeFade = 1 - Math.pow(Math.abs(lane), 1.5) * 0.32;
+      const wave = 0.5 + 0.5 * Math.sin(loop * (1 + (i % 2)) + seed * Math.PI * 2 + lane * 1.2);
+      const height = r * (0.18 + intensity * 0.28 + density * 0.08) * (0.62 + seed * 0.55 + wave * 0.35) * edgeFade;
+      const width = r * (0.028 + intensity * 0.038 + density * 0.016) * (0.85 + seed * 0.55) * edgeFade;
+      const lean = Math.sin(loop + seed * Math.PI * 2) * r * (0.025 + intensity * 0.035) - lane * r * 0.03;
+      const tipX = baseX + lean;
+      const tipY = base - height;
+      const colorOuter = lerpColor(mainColor, secondaryColor, 0.14 + seed * 0.34);
+
+      g.poly([
+        baseX - width * 1.45, base,
+        baseX + width * 1.35, base,
+        tipX + width * 0.55, tipY + height * 0.44,
+        tipX, tipY,
+        tipX - width * 0.52, tipY + height * 0.44,
+      ], true).fill({ color: colorOuter, alpha: 0.16 + intensity * 0.16 });
+
+      g.poly([
+        baseX - width * 0.58, base - height * 0.08,
+        baseX + width * 0.55, base - height * 0.08,
+        tipX + width * 0.2, tipY + height * 0.54,
+        tipX, tipY + height * (0.18 + seed * 0.1),
+        tipX - width * 0.2, tipY + height * 0.54,
+      ], true).fill({ color: lerpColor(secondaryColor, whiteHot, 0.22 + seed * 0.25), alpha: 0.12 + intensity * 0.18 });
     }
 
-    // Sort particles
-    const sorted = [...this.particles].sort((a, b) => {
-      const ta = 1 - a.life / a.maxLife;
-      const tb = 1 - b.life / b.maxLife;
-      return tb - ta;
-    });
+    const sparkCount = 10 + Math.floor(this.params.density * 0.34);
+    for (let i = 0; i < sparkCount; i++) {
+      const seed = pseudoRandom(i * 19.91 + 8.8);
+      const progress = this.getWrappedPhase(phase * (1 + (i % 3)) + seed);
+      const lane = pseudoRandom(i * 5.17 + 2.4) * 2 - 1;
+      const rise = r * (0.08 + progress * (0.48 + intensity * 0.32));
+      const drift = Math.sin(loop * 1.5 + seed * Math.PI * 2) * r * (0.025 + intensity * 0.05);
+      const x = cx + lane * r * (0.44 + density * 0.24) * (1 - progress * 0.28) + drift;
+      const y = baseY - rise;
+      const fade = Math.sin(progress * Math.PI);
+      const size = (0.7 + intensity * 1.3 + seed * 1.5) * (0.55 + fade * 0.75);
+      const color = progress < 0.35 ? hexToNum(whiteHot) : lerpColor(secondaryColor, emberColor, progress);
 
-    for (const p of sorted) {
-      const lifeRatio = 1 - p.life / p.maxLife;
-      const alpha = lifeRatio < 0.1
-        ? lifeRatio / 0.1
-        : lifeRatio > 0.7
-          ? (1 - lifeRatio) / 0.3
-          : 1;
-
-      if (p.orbitLayer === 1) {
-        const sparkColor = lifeRatio < 0.35 ? hexToNum(whiteHot) : lerpColor(secondaryColor, emberColor, lifeRatio);
-        if (p.trail && p.trail.length >= 2) {
-          for (let i = 1; i < p.trail.length; i++) {
-            const prev = p.trail[i - 1];
-            const point = p.trail[i];
-            g.moveTo(prev.x, prev.y);
-            g.lineTo(point.x, point.y);
-            g.stroke({ color: sparkColor, alpha: alpha * p.alpha * (i / p.trail.length) * 0.35, width: Math.max(0.5, p.size * 0.45) });
-          }
-        }
-        g.circle(p.x, p.y, p.size * (2.2 + intensity * 1.6)).fill({ color: sparkColor, alpha: alpha * p.alpha * (0.08 + intensity * 0.08) });
-        g.circle(p.x, p.y, p.size).fill({ color: sparkColor, alpha: alpha * p.alpha });
-        continue;
-      }
-
-      let colorNum: number;
-      if (lifeRatio < 0.22) {
-        colorNum = lerpColor(whiteHot, secondaryColor, lifeRatio / 0.22);
-      } else if (lifeRatio < 0.58) {
-        colorNum = lerpColor(secondaryColor, midColor, (lifeRatio - 0.22) / 0.36);
-      } else {
-        colorNum = lerpColor(midColor, emberColor, (lifeRatio - 0.58) / 0.42);
-      }
-
-      const flameStretch = 1.65 + intensity * 0.75 + lifeRatio * 0.9;
-      const wobble = Math.sin(this.time * (p.swaySpeed ?? 2) + (p.swayPhase ?? 0)) * p.size * 0.18;
-      g.ellipse(p.x + wobble, p.y, p.size * (1.25 + intensity * 0.45), p.size * flameStretch).fill({ color: colorNum, alpha: alpha * p.alpha * (0.12 + intensity * 0.08) });
-      g.ellipse(p.x, p.y - p.size * 0.22, p.size * 0.72, p.size * (1.1 + intensity * 0.5)).fill({ color: colorNum, alpha: alpha * p.alpha * (0.28 + intensity * 0.18) });
-      g.ellipse(p.x, p.y - p.size * 0.42, p.size * 0.32, p.size * 0.7).fill({ color: hexToNum(whiteHot), alpha: alpha * p.alpha * (0.16 + intensity * 0.18) });
+      g.moveTo(x + r * 0.015, y + size * 2.2);
+      g.lineTo(x - drift * 0.35, y - size * 1.4);
+      g.stroke({ color, alpha: fade * (0.12 + intensity * 0.2), width: Math.max(0.45, size * 0.32) });
+      g.circle(x, y, size * (1.8 + intensity)).fill({ color, alpha: fade * (0.04 + intensity * 0.08) });
+      g.circle(x, y, size).fill({ color, alpha: fade * (0.42 + intensity * 0.36) });
     }
   }
 
@@ -2674,61 +2642,9 @@ export class ParticleEngine {
   // AURORA
   // ════════════════════════════════════════════════════════════════════
 
-  private updateAurora(cw: number, ch: number, sz: number) {
-    const speedStep = this.getSpeedStep();
-    this.auroraTime += 0.016 * speedStep;
-    const cx = cw / 2;
-    const cy = ch / 2;
-    const r = sz / 2;
-    const intensity = this.params.intensity / 100;
-    const bandCount = 3 + Math.round(intensity * 3);
-    const targetCount = Math.floor(this.params.density * (0.72 + intensity * 0.78)) + 26 + Math.floor(intensity * 22);
-
-    if (this.particles.length > targetCount) {
-      this.particles.length = targetCount;
-    }
-
-    while (this.particles.length < targetCount) {
-      const band = Math.floor(Math.random() * bandCount);
-      const layerT = bandCount <= 1 ? 0 : band / (bandCount - 1);
-      const span = sz * (0.7 + intensity * 0.2 + layerT * 0.08);
-      const x = this.shape === 'circle'
-        ? cx + (Math.random() - 0.5) * span
-        : cx + (Math.random() - 0.5) * Math.min(span, sz * 0.96);
-      const y = cy - r * (0.74 - layerT * 0.22) + (Math.random() - 0.5) * r * 0.08;
-      this.particles.push({
-        x,
-        y,
-        vx: 0, vy: 0,
-        life: 420 + Math.random() * 520,
-        maxLife: 940,
-        size: 14 + intensity * 26 + Math.random() * (24 + intensity * 34),
-        color: Math.random() > 0.5 ? this.params.color : this.params.secondaryColor,
-        alpha: 0.035 + intensity * 0.08 + Math.random() * (0.035 + intensity * 0.04),
-        orbitLayer: band,
-        flowOffset: Math.random(),
-        swayPhase: Math.random() * Math.PI * 2 + band * 1.3,
-        swaySpeed: 0.2 + intensity * 0.25 + Math.random() * (0.24 + intensity * 0.28),
-      });
-    }
-
-    this.particles = this.particles.filter(p => {
-      const band = p.orbitLayer ?? 0;
-      const layerT = bandCount <= 1 ? 0 : band / (bandCount - 1);
-      const wave = Math.sin(this.auroraTime * (p.swaySpeed ?? 0.4) + (p.swayPhase ?? 0));
-      const drift = Math.sin(this.auroraTime * (0.18 + intensity * 0.08) + (p.swayPhase ?? 0) * 0.7);
-      p.x += (wave * (0.38 + intensity * 0.6) + drift * (0.45 + intensity * 0.45)) * speedStep;
-      p.y += Math.sin(this.auroraTime * (0.16 + intensity * 0.1) + (p.swayPhase ?? 0)) * (0.06 + intensity * 0.14 + layerT * 0.08) * speedStep;
-      const spanHalf = r * (0.42 + intensity * 0.16 + layerT * 0.14);
-      if (p.x < cx - spanHalf) p.x = cx + spanHalf;
-      if (p.x > cx + spanHalf) p.x = cx - spanHalf;
-      p.alpha = (
-        0.024 + intensity * 0.04
-        + (0.026 + intensity * 0.07) * (0.5 + 0.5 * Math.sin(this.auroraTime * 1.15 + (p.swayPhase ?? 0)))
-      ) * (p.life / (p.maxLife ?? 800));
-      p.life -= speedStep * 0.35;
-      return p.life > 0;
-    });
+  private updateAurora(_cw: number, _ch: number, _sz: number) {
+    this.auroraTime += this.frameDeltaSeconds * this.getSpeedStep() * 0.5;
+    this.particles = [];
   }
 
   private drawAurora(g: PIXI.Graphics, cw: number, ch: number, sz: number) {
@@ -2736,24 +2652,36 @@ export class ParticleEngine {
     const cy = ch / 2;
     const r = sz / 2;
     const intensity = this.params.intensity / 100;
-    const curtainCount = 4 + Math.round(intensity * 3);
-    const segments = 34;
+    const density = this.params.density / 100;
+    const phase = this.getEffectLoopProgress(this.auroraTime, 1);
+    const loop = phase * Math.PI * 2;
+    const curtainCount = 3 + Math.floor(density * 3) + Math.floor(intensity * 2);
+    const segments = 44;
     const colorNum = hexToNum(this.params.color);
     const secColorNum = hexToNum(this.params.secondaryColor);
-    const midColor = lerpColor(this.params.color, this.params.secondaryColor, 0.5);
-    const paleColor = lerpColor(this.params.secondaryColor, '#ffffff', 0.55);
+    const midColor = lerpColor(this.params.color, this.params.secondaryColor, 0.45);
+    const paleColor = lerpColor(this.params.secondaryColor, '#ffffff', 0.58);
 
     for (let i = 5; i >= 0; i--) {
       const t = i / 5;
-      g.ellipse(cx, cy - r * 0.5, r * (0.55 + t * 0.55), r * (0.22 + t * 0.28))
-        .fill({ color: i % 2 === 0 ? colorNum : secColorNum, alpha: (0.012 + intensity * 0.018) * (1 - t) });
+      const pulse = 0.88 + 0.12 * Math.sin(loop + t * Math.PI);
+      g.ellipse(
+        cx,
+        cy - r * (0.48 - t * 0.02),
+        r * (0.55 + t * 0.55) * pulse,
+        r * (0.18 + t * 0.28),
+      ).fill({
+        color: i % 2 === 0 ? colorNum : secColorNum,
+        alpha: (0.012 + intensity * 0.018) * (1 - t),
+      });
     }
 
     for (let layer = 0; layer < curtainCount; layer++) {
       const layerT = curtainCount <= 1 ? 0 : layer / (curtainCount - 1);
-      const yBase = cy - r * (0.78 - layerT * 0.15);
-      const thickness = r * (0.18 + intensity * 0.15 + layerT * 0.08);
-      const span = sz * (0.7 + intensity * 0.16 + layerT * 0.08);
+      const seed = pseudoRandom(layer * 17.13 + 1.5);
+      const yBase = cy - r * (0.68 - layerT * 0.22);
+      const thickness = r * (0.09 + intensity * 0.14 + density * 0.04 + layerT * 0.035);
+      const span = sz * (0.82 + density * 0.16 + layerT * 0.08);
       const pointsTop: Array<{ x: number; y: number }> = [];
       const pointsBottom: Array<{ x: number; y: number }> = [];
       const layerColor = layer % 3 === 0 ? colorNum : layer % 3 === 1 ? midColor : secColorNum;
@@ -2761,13 +2689,13 @@ export class ParticleEngine {
       for (let i = 0; i <= segments; i++) {
         const t = i / segments;
         const x = cx - span / 2 + span * t;
-        const sway =
-          Math.sin(this.auroraTime * (0.38 + intensity * 0.32 + layer * 0.07) + t * Math.PI * (2.2 + layer * 0.3) + layer * 1.15) * (8 + intensity * 16 + layer * 4) +
-          Math.sin(this.auroraTime * (0.68 + intensity * 0.34) + t * Math.PI * 5.2 + layer * 0.6) * (4 + intensity * 7);
-        const taper = 0.55 + 0.45 * Math.sin(t * Math.PI);
-        const crest = yBase + sway * 0.32;
-        pointsTop.push({ x, y: crest - thickness * taper * 0.28 });
-        pointsBottom.push({ x, y: crest + thickness * taper * (1.15 + layerT * 0.3) });
+        const taper = Math.sin(t * Math.PI);
+        const wave =
+          Math.sin(loop * (1 + layer) + t * Math.PI * (2.0 + layerT) + seed * Math.PI * 2) * r * (0.03 + intensity * 0.045) +
+          Math.sin(-loop * (2 + (layer % 2)) + t * Math.PI * (4.0 + layerT * 1.2) + layer * 0.7) * r * (0.015 + intensity * 0.026);
+        const crest = yBase + wave;
+        pointsTop.push({ x, y: crest - thickness * (0.18 + taper * 0.08) });
+        pointsBottom.push({ x, y: crest + thickness * (0.72 + taper * (0.58 + intensity * 0.4)) });
       }
 
       g.moveTo(pointsTop[0].x, pointsTop[0].y);
@@ -2778,29 +2706,42 @@ export class ParticleEngine {
         g.lineTo(pointsBottom[i].x, pointsBottom[i].y);
       }
       g.closePath();
-      g.fill({ color: layerColor, alpha: 0.028 + intensity * 0.064 + layerT * (0.01 + intensity * 0.014) });
+      g.fill({
+        color: layerColor,
+        alpha: (0.045 + intensity * 0.07) * (1 - layerT * 0.28),
+      });
 
-      const rayEvery = layer % 2 === 0 ? 4 : 5;
-      for (let i = rayEvery; i < pointsTop.length - 1; i += rayEvery) {
-        const top = pointsTop[i];
-        const bottom = pointsBottom[i];
-        g.moveTo(top.x, top.y);
-        g.lineTo(bottom.x, bottom.y + r * (0.08 + intensity * 0.08));
+      const rayCount = 7 + Math.floor(density * 10);
+      for (let i = 0; i < rayCount; i++) {
+        const t = (i + 0.5) / rayCount;
+        const raySeed = pseudoRandom(layer * 101 + i * 13.7);
+        const x = cx - span / 2 + span * t;
+        const wobble =
+          Math.sin(loop * (1 + layer) + t * Math.PI * (2.0 + layerT) + seed * Math.PI * 2) * r * (0.03 + intensity * 0.045) +
+          Math.sin(-loop * (2 + (layer % 2)) + t * Math.PI * (4.0 + layerT * 1.2) + layer * 0.7) * r * (0.015 + intensity * 0.026);
+        const taper = Math.sin(t * Math.PI);
+        const topY = yBase + wobble - thickness * 0.15;
+        const bottomY = yBase + wobble + thickness * (0.9 + taper * (0.8 + intensity * 0.7));
+        const shine = 0.55 + 0.45 * Math.sin(loop * (1 + (i % 2)) + raySeed * Math.PI * 2);
+        g.moveTo(x, topY);
+        g.lineTo(x + Math.sin(loop + raySeed * Math.PI * 2) * r * 0.018, bottomY);
         g.stroke({
-          width: 1 + intensity * 1.4,
-          color: layer % 2 === 0 ? paleColor : layerColor,
-          alpha: (0.035 + intensity * 0.08) * (1 - layerT * 0.35),
+          width: 0.7 + intensity * 1.4 + raySeed * 0.7,
+          color: raySeed > 0.5 ? paleColor : layerColor,
+          alpha: (0.035 + intensity * 0.09) * shine * (1 - layerT * 0.25),
         });
       }
     }
 
-    for (const p of this.particles) {
-      const pColor = hexToNum(p.color);
-      const band = p.orbitLayer ?? 0;
-      const stretch = 0.2 + intensity * 0.16 + 0.1 * Math.sin(this.auroraTime + (p.swayPhase ?? 0));
-      g.ellipse(p.x, p.y, p.size * (1.3 + intensity * 0.8), p.size * stretch)
-        .fill({ color: band % 2 === 0 ? pColor : paleColor, alpha: p.alpha * (0.42 + intensity * 0.35) });
-      g.circle(p.x, p.y, p.size * (0.12 + intensity * 0.1)).fill({ color: paleColor, alpha: p.alpha * (0.35 + intensity * 0.35) });
+    const glintCount = 5 + Math.floor(density * 14);
+    for (let i = 0; i < glintCount; i++) {
+      const seed = pseudoRandom(i * 23.4 + 5.7);
+      const x = cx + (pseudoRandom(i * 7.9 + 3.2) - 0.5) * r * (1.35 + density * 0.22);
+      const y = cy - r * (0.62 - pseudoRandom(i * 11.3 + 1.9) * 0.55);
+      const pulse = 0.5 + 0.5 * Math.sin(loop * (1 + (i % 3)) + seed * Math.PI * 2);
+      const size = 0.9 + intensity * 1.3 + seed * 1.2;
+      g.circle(x, y, size * (2.4 + intensity * 1.8)).fill({ color: paleColor, alpha: pulse * (0.018 + intensity * 0.035) });
+      g.circle(x, y, size).fill({ color: paleColor, alpha: pulse * (0.12 + intensity * 0.18) });
     }
   }
 
@@ -2882,163 +2823,71 @@ export class ParticleEngine {
   // RAIN
   // ════════════════════════════════════════════════════════════════════
 
-  private updateRain(cw: number, ch: number, sz: number) {
-    const speedStep = this.getSpeedStep();
-    this.rainTime += 0.016 * speedStep;
-    const cx = cw / 2, cy = ch / 2, r = sz / 2;
-    const intensity = this.params.intensity / 100;
-    const targetCount = Math.floor(this.params.density * (1.45 + intensity * 1.35)) + 38 + Math.floor(intensity * 34);
-    const wind = -(0.85 + intensity * 1.05);
-
-    if (this.particles.length > targetCount) {
-      this.particles.length = targetCount;
-    }
-
-    while (this.particles.length < targetCount) {
-      const sideSpawn = Math.random() < 0.34 + intensity * 0.16;
-      const x = sideSpawn
-        ? cx + r * (0.7 + Math.random() * 0.55)
-        : cx + (Math.random() - 0.5) * sz * 1.18;
-      const y = sideSpawn
-        ? cy - r * (0.95 + Math.random() * 0.35)
-        : cy - r * (1.03 + Math.random() * 0.3);
-      const streak = Math.random() < 0.22 + intensity * 0.24;
-      this.particles.push({
-        x,
-        y,
-        vx: wind + (Math.random() - 0.5) * (0.28 + intensity * 0.3),
-        vy: 4.8 + intensity * 4.1 + Math.random() * (2.7 + intensity * 3.2),
-        life: 48 + Math.random() * 52,
-        maxLife: 100,
-        size: streak
-          ? 1.05 + intensity * 1.5 + Math.random() * (1.0 + intensity * 1.0)
-          : 0.55 + intensity * 0.8 + Math.random() * (0.55 + intensity * 0.9),
-        color: streak || Math.random() > 0.46 ? this.params.color : this.params.secondaryColor,
-        alpha: streak
-          ? 0.44 + intensity * 0.34 + Math.random() * 0.16
-          : 0.22 + intensity * 0.28 + Math.random() * 0.22,
-        orbitLayer: streak ? 0 : 1,
-        trail: [],
-      });
-    }
-
-    const splashes: Particle[] = [];
-    this.particles = this.particles.filter(p => {
-      if (p.orbitLayer === 2) {
-        p.x += p.vx * speedStep;
-        p.y += p.vy * speedStep;
-        p.vy += (0.12 + intensity * 0.08) * speedStep;
-        p.vx *= Math.pow(0.94, speedStep);
-        p.life -= speedStep;
-        return p.life > 0;
-      }
-
-      if (p.trail) {
-        p.trail.push({ x: p.x, y: p.y, alpha: p.alpha, size: p.size });
-        if (p.trail.length > (p.orbitLayer === 0 ? 5 : 3)) p.trail.shift();
-      }
-      p.x += p.vx * speedStep;
-      p.y += p.vy * speedStep;
-      p.vx += wind * 0.008 * speedStep;
-      p.vy += (0.035 + intensity * 0.06) * speedStep;
-
-      const impactY = cy + r * (0.62 + intensity * 0.04);
-      const canSplash = p.y >= impactY && p.y <= impactY + r * 0.18 && Math.random() < 0.09 + intensity * 0.1;
-
-      if (this.shape === 'circle') {
-        const dx = p.x - cx, dy = p.y - cy;
-        const insideCircle = dx * dx + dy * dy <= r * r;
-        const hasEnteredRainBand = p.y >= cy - r * 0.98;
-        if (!insideCircle && hasEnteredRainBand) {
-          if (dy > r * 0.2 && Math.random() < 0.35 + intensity * 0.25) {
-            for (let i = 0; i < 2; i++) {
-              splashes.push({
-                x: p.x,
-                y: p.y,
-                vx: (Math.random() - 0.5) * (1.1 + intensity * 1.3),
-                vy: -(0.7 + Math.random() * (0.7 + intensity * 0.8)),
-                life: 10 + Math.random() * 10,
-                maxLife: 20,
-                size: 0.6 + intensity * 0.8 + Math.random() * 0.8,
-                color: this.params.secondaryColor,
-                alpha: 0.34 + intensity * 0.34,
-                orbitLayer: 2,
-              });
-            }
-          }
-          p.life = 0;
-        }
-      } else if (!this.isInsideShapePoint(p.x, p.y, cx, cy, r)) {
-        if (p.y > cy && Math.random() < 0.28 + intensity * 0.2) {
-          for (let i = 0; i < 2; i++) {
-            splashes.push({
-              x: p.x,
-              y: p.y,
-              vx: (Math.random() - 0.5) * (1.1 + intensity * 1.3),
-              vy: -(0.7 + Math.random() * (0.7 + intensity * 0.8)),
-              life: 10 + Math.random() * 10,
-              maxLife: 20,
-              size: 0.6 + intensity * 0.8 + Math.random() * 0.8,
-              color: this.params.secondaryColor,
-              alpha: 0.34 + intensity * 0.34,
-              orbitLayer: 2,
-            });
-          }
-        }
-        p.life = 0;
-      }
-
-      if (canSplash) {
-        splashes.push({
-          x: p.x,
-          y: p.y,
-          vx: (Math.random() - 0.5) * (0.8 + intensity * 1.0),
-          vy: -(0.35 + Math.random() * (0.45 + intensity * 0.55)),
-          life: 8 + Math.random() * 8,
-          maxLife: 16,
-          size: 0.45 + intensity * 0.7 + Math.random() * 0.55,
-          color: this.params.secondaryColor,
-          alpha: 0.22 + intensity * 0.32,
-          orbitLayer: 2,
-        });
-      }
-
-      p.life -= speedStep;
-      return p.life > 0 && p.y < ch + 10;
-    });
-
-    if (splashes.length) {
-      this.particles.push(...splashes.slice(0, Math.floor(10 + intensity * 16)));
-    }
+  private updateRain(_cw: number, _ch: number, _sz: number) {
+    this.rainTime += this.frameDeltaSeconds * this.getSpeedStep() * 0.5;
+    this.particles = [];
   }
 
-  private drawRain(g: PIXI.Graphics, _cw: number, _ch: number, _sz: number) {
+  private drawRain(g: PIXI.Graphics, cw: number, ch: number, sz: number) {
+    const cx = cw / 2, cy = ch / 2, r = sz / 2;
     const intensity = this.params.intensity / 100;
+    const density = this.params.density / 100;
+    const phase = this.getEffectLoopProgress(this.rainTime, 1);
+    const mainColor = hexToNum(this.params.color);
+    const secondaryColor = hexToNum(this.params.secondaryColor);
+    const rainCount = 38 + Math.floor(density * 92) + Math.floor(intensity * 24);
+    const slant = r * (0.085 + intensity * 0.05);
+    const fallSpan = sz * 1.55;
+    const top = cy - r * 0.98 - fallSpan * 0.12;
 
-    for (const p of this.particles) {
-      const lifeRatio = p.life / (p.maxLife ?? 140);
-      const a = p.alpha * Math.min(1, lifeRatio * 3);
-      const pColor = hexToNum(p.color);
+    for (let i = 0; i < rainCount; i++) {
+      const seed = pseudoRandom(i * 41.37 + 12.4);
+      const xSeed = pseudoRandom(i * 13.17 + 7.1);
+      const localPhase = this.getWrappedPhase(phase * (1 + (i % 3)) + seed);
+      const laneX = cx - r * 0.82 + xSeed * r * 1.64;
+      const y = top + localPhase * fallSpan;
+      const sway = Math.sin((phase + seed) * Math.PI * 2) * r * (0.012 + intensity * 0.012);
+      const x = laneX - slant * localPhase * 2.4 + sway;
+      const length = r * (0.1 + intensity * 0.15 + seed * 0.07);
+      const width = 0.45 + intensity * 0.75 + (seed > 0.78 ? 0.45 : 0);
+      const headX = x;
+      const headY = y;
+      const tailX = x + slant * (0.8 + seed * 0.45);
+      const tailY = y - length;
+      const midX = (headX + tailX) / 2;
+      const midY = (headY + tailY) / 2;
 
-      if (p.orbitLayer === 2) {
-        g.circle(p.x, p.y, p.size * (1.0 + intensity * 0.5)).fill({ color: pColor, alpha: a * 0.75 });
-        g.circle(p.x, p.y, p.size * (2.2 + intensity * 1.5)).fill({ color: pColor, alpha: a * 0.12 });
+      if (!this.isInsideShapePoint(midX, midY, cx, cy, r, r * 0.015)) {
         continue;
       }
 
-      const trailScale = p.orbitLayer === 0 ? 2.2 + intensity * 2.4 : 1.15 + intensity * 1.45;
-      const tailX = p.x - p.vx * trailScale;
-      const tailY = p.y - p.vy * trailScale;
+      const edgeDx = Math.abs(midX - cx) / r;
+      const edgeDy = Math.abs(midY - cy) / r;
+      const edgeFade = this.shape === 'circle'
+        ? Math.max(0.15, 1 - Math.max(0, Math.hypot(midX - cx, midY - cy) / r - 0.62) * 2.6)
+        : Math.max(0.2, 1 - Math.max(edgeDx, edgeDy) * 0.18);
+      const color = seed > 0.68 ? secondaryColor : mainColor;
+      const alpha = (0.22 + intensity * 0.36 + seed * 0.18) * edgeFade;
 
-      g.moveTo(p.x, p.y);
+      g.moveTo(headX, headY);
       g.lineTo(tailX, tailY);
-      g.stroke({
-        color: pColor,
-        alpha: a * (p.orbitLayer === 0 ? 0.64 + intensity * 0.34 : 0.42 + intensity * 0.26),
-        width: p.size,
-      });
+      g.stroke({ color, alpha, width });
 
-      g.circle(p.x, p.y, p.size * (1.2 + intensity * 1.4)).fill({ color: pColor, alpha: a * (0.04 + intensity * 0.09) });
+      if (seed > 0.72) {
+        g.moveTo(headX + 0.8, headY + 0.8);
+        g.lineTo(tailX + 0.8, tailY + 0.8);
+        g.stroke({ color: secondaryColor, alpha: alpha * 0.24, width: width + 1.1 });
+      }
+    }
+
+    const sheetCount = 3 + Math.floor(intensity * 3);
+    for (let i = 0; i < sheetCount; i++) {
+      const t = i / Math.max(sheetCount - 1, 1);
+      const y = cy - r * 0.72 + t * r * 1.28;
+      const alpha = (0.012 + intensity * 0.025) * (1 - Math.abs(t - 0.5) * 0.8);
+      g.moveTo(cx - r * 0.86, y + Math.sin(phase * Math.PI * 2 + i) * r * 0.015);
+      g.lineTo(cx + r * 0.82, y - r * (0.05 + intensity * 0.03));
+      g.stroke({ color: secondaryColor, alpha, width: 0.7 + intensity * 0.7 });
     }
   }
   // ════════════════════════════════════════════════════════════════════
@@ -3265,6 +3114,7 @@ export class ParticleEngine {
     this.matrixColumns = [];
     this.matrixTimer = 0;
     this.bubbleTime = 0;
+    this.fireTime = 0;
     this.auroraTime = 0;
 
     this.fireflyTime = 0;
@@ -3272,6 +3122,7 @@ export class ParticleEngine {
     this.solidRingPhase = 0;
     this.discPhase = 0;
     this.googleOnePhase = 0;
+    this.effectLoopPhase = null;
     this.frameDeltaSeconds = 1 / 60;
     this.lastUpdateAt = 0;
     this.fixedDeltaSeconds = null;

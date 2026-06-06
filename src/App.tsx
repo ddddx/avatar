@@ -25,6 +25,7 @@ const supportsMediaRecorder = typeof MediaRecorder !== 'undefined';
 const supportsWebWorkers = typeof Worker !== 'undefined';
 const GIF_TRANSPARENT_KEY = 0xff00ff;
 const RING_EFFECTS = new Set<EffectType>(['solidring', 'disc', 'googleone', 'duotone', 'blinkring', 'linxudo', 'bounce', 'collapsequad', 'axisrings', 'loader', 'spinner', 'neoncomet', 'equalizer', 'magiccircle', 'cyberhud', 'crtglitch', 'portal', 'kaleidoscope']);
+const PREVIEW_LOOP_EFFECTS = new Set<EffectType>(['fire', 'aurora', 'rain']);
 const TRANSPARENT_STAGE_EFFECTS = new Set<EffectType>(['bounce']);
 const EFFECT_LABELS: Record<EffectType, string> = {
   solidring: '实心环',
@@ -98,7 +99,7 @@ function hasTransparentStage(
 }
 
 function getRingExportTiming(effect: EffectType, fallbackFps: number, params: EffectParams) {
-  if (!RING_EFFECTS.has(effect)) {
+  if (!RING_EFFECTS.has(effect) && !PREVIEW_LOOP_EFFECTS.has(effect)) {
     return {
       frameCount: Math.floor((2000 / 1000) * fallbackFps),
       frameDelay: Math.round(1000 / fallbackFps),
@@ -106,7 +107,11 @@ function getRingExportTiming(effect: EffectType, fallbackFps: number, params: Ef
   }
 
   const clampedSpeed = Math.max(1, Math.min(params.speed, 100));
-  const loopDuration = RING_LOOP_DURATION_MS * (RING_LOOP_SPEED_BASELINE / clampedSpeed);
+  const loopDuration = (
+    RING_EFFECTS.has(effect)
+      ? RING_LOOP_DURATION_MS * (RING_LOOP_SPEED_BASELINE / clampedSpeed)
+      : 2000 * (50 / clampedSpeed)
+  );
   const frameDelay = Math.round(1000 / fallbackFps);
 
   return {
@@ -288,7 +293,7 @@ function App() {
     const fps = 20;
     const mimeType = getSupportedWebMMimeType();
 
-    if (RING_EFFECTS.has(effect)) {
+    if (RING_EFFECTS.has(effect) || PREVIEW_LOOP_EFFECTS.has(effect)) {
       const { frameCount, frameDelay } = getRingExportTiming(effect, fps, params);
       const frameCanvas = document.createElement('canvas');
       frameCanvas.width = canvas.width;
@@ -298,16 +303,19 @@ function App() {
         throw new Error('无法创建 WebM 导出画布');
       }
 
-      const ringRenderer = createOfflineRingRenderer({
-        width: canvas.width,
-        height: canvas.height,
-        image,
-        gifData,
-        effect,
-        shape,
-        mirror,
-        params,
-      });
+      const exportCanvas = canvas as ExportDrivenCanvas;
+      const ringRenderer = RING_EFFECTS.has(effect)
+        ? createOfflineRingRenderer({
+            width: canvas.width,
+            height: canvas.height,
+            image,
+            gifData,
+            effect,
+            shape,
+            mirror,
+            params,
+          })
+        : null;
       const stream = frameCanvas.captureStream(0);
       const track = stream.getVideoTracks()[0] as MediaStreamTrack & { requestFrame?: () => void };
       const recorder = new MediaRecorder(stream, {
@@ -328,14 +336,30 @@ function App() {
         recorder.start();
 
         const renderFrames = async () => {
-          for (let i = 0; i < frameCount; i++) {
-            const ringProgress = getRingExportFrameProgress(effect, i, frameCount);
-            const sourceCanvas = ringRenderer.renderFrame(ringProgress, i * frameDelay);
-            frameCtx.clearRect(0, 0, frameCanvas.width, frameCanvas.height);
-            frameCtx.drawImage(sourceCanvas, 0, 0);
-            track.requestFrame?.();
-            setExportProgress((i + 1) / frameCount * 0.95);
-            await new Promise(r => setTimeout(r, frameDelay));
+          try {
+            if (!ringRenderer) {
+              exportCanvas.__avatarSetExportFrameStep?.(frameDelay);
+            }
+            for (let i = 0; i < frameCount; i++) {
+              const frameProgress = getRingExportFrameProgress(effect, i, frameCount);
+              const sourceCanvas = ringRenderer
+                ? ringRenderer.renderFrame(frameProgress, i * frameDelay)
+                : (() => {
+                    exportCanvas.__avatarSetRingLoopProgress?.(frameProgress);
+                    exportCanvas.__avatarRenderFrame?.();
+                    return exportCanvas.__avatarExtractFrame?.() ?? canvas;
+                  })();
+              frameCtx.clearRect(0, 0, frameCanvas.width, frameCanvas.height);
+              frameCtx.drawImage(sourceCanvas, 0, 0);
+              track.requestFrame?.();
+              setExportProgress((i + 1) / frameCount * 0.95);
+              await new Promise(r => setTimeout(r, frameDelay));
+            }
+          } finally {
+            if (!ringRenderer) {
+              exportCanvas.__avatarSetRingLoopProgress?.(null);
+              exportCanvas.__avatarSetExportFrameStep?.(null);
+            }
           }
           setExportProgress(1);
           recorder.stop();
@@ -398,6 +422,7 @@ function App() {
 
     const { frameCount, frameDelay: captureDelay } = getRingExportTiming(effect, fps, params);
     const exportCanvas = canvas as ExportDrivenCanvas;
+    const drivePreviewLoop = PREVIEW_LOOP_EFFECTS.has(effect);
     const ringRenderer = RING_EFFECTS.has(effect)
       ? createOfflineRingRenderer({
           width: canvas.width,
@@ -425,21 +450,23 @@ function App() {
     const BG_THRESHOLD = 8; // pixels dimmer than this are "background" → transparent
 
     try {
-      if (RING_EFFECTS.has(effect) && !ringRenderer) {
+      if (drivePreviewLoop) {
         exportCanvas.__avatarSetExportFrameStep?.(captureDelay);
       }
 
       // Capture frames
       for (let i = 0; i < frameCount; i++) {
-        const ringProgress = getRingExportFrameProgress(effect, i, frameCount);
-        if (RING_EFFECTS.has(effect) && !ringRenderer) {
-          exportCanvas.__avatarSetRingLoopProgress?.(ringProgress);
+        const frameProgress = getRingExportFrameProgress(effect, i, frameCount);
+        if (drivePreviewLoop) {
+          exportCanvas.__avatarSetRingLoopProgress?.(frameProgress);
           exportCanvas.__avatarRenderFrame?.();
         }
 
         const sourceCanvas = RING_EFFECTS.has(effect)
-          ? (ringRenderer?.renderFrame(ringProgress, i * captureDelay) ?? exportCanvas.__avatarExtractFrame?.() ?? canvas)
-          : canvas;
+          ? (ringRenderer?.renderFrame(frameProgress, i * captureDelay) ?? exportCanvas.__avatarExtractFrame?.() ?? canvas)
+          : drivePreviewLoop
+            ? (exportCanvas.__avatarExtractFrame?.() ?? canvas)
+            : canvas;
 
         if (offscreen && offCtx) {
           offCtx.clearRect(0, 0, offscreen.width, offscreen.height);
@@ -469,13 +496,15 @@ function App() {
           gif.addFrame(sourceCanvas, { copy: true, delay: captureDelay });
         }
         setExportProgress((i + 1) / frameCount * 0.5);
-        if (!RING_EFFECTS.has(effect)) {
+        if (!RING_EFFECTS.has(effect) && !drivePreviewLoop) {
           await new Promise(r => setTimeout(r, captureDelay));
         }
       }
     } finally {
-      exportCanvas.__avatarSetRingLoopProgress?.(null);
-      exportCanvas.__avatarSetExportFrameStep?.(null);
+      if (drivePreviewLoop) {
+        exportCanvas.__avatarSetRingLoopProgress?.(null);
+        exportCanvas.__avatarSetExportFrameStep?.(null);
+      }
     }
 
     // Render GIF
@@ -507,6 +536,7 @@ function App() {
     const w = canvas.width;
     const h = canvas.height;
     const exportCanvas = canvas as ExportDrivenCanvas;
+    const drivePreviewLoop = PREVIEW_LOOP_EFFECTS.has(effect);
     const ringRenderer = RING_EFFECTS.has(effect)
       ? createOfflineRingRenderer({
           width: w,
@@ -530,20 +560,22 @@ function App() {
     const offCtx = offscreen.getContext('2d')!;
 
     try {
-      if (RING_EFFECTS.has(effect) && !ringRenderer) {
+      if (drivePreviewLoop) {
         exportCanvas.__avatarSetExportFrameStep?.(frameDelay);
       }
 
       for (let i = 0; i < frameCount; i++) {
-        const ringProgress = getRingExportFrameProgress(effect, i, frameCount);
-        if (RING_EFFECTS.has(effect) && !ringRenderer) {
-          exportCanvas.__avatarSetRingLoopProgress?.(ringProgress);
+        const frameProgress = getRingExportFrameProgress(effect, i, frameCount);
+        if (drivePreviewLoop) {
+          exportCanvas.__avatarSetRingLoopProgress?.(frameProgress);
           exportCanvas.__avatarRenderFrame?.();
         }
 
         const sourceCanvas = RING_EFFECTS.has(effect)
-          ? (ringRenderer?.renderFrame(ringProgress, i * frameDelay) ?? exportCanvas.__avatarExtractFrame?.() ?? canvas)
-          : canvas;
+          ? (ringRenderer?.renderFrame(frameProgress, i * frameDelay) ?? exportCanvas.__avatarExtractFrame?.() ?? canvas)
+          : drivePreviewLoop
+            ? (exportCanvas.__avatarExtractFrame?.() ?? canvas)
+            : canvas;
 
         offCtx.clearRect(0, 0, w, h);
         offCtx.drawImage(sourceCanvas, 0, 0);
@@ -555,13 +587,15 @@ function App() {
         delays.push(frameDelay);
 
         setExportProgress((i + 1) / frameCount * 0.8);
-        if (!RING_EFFECTS.has(effect)) {
+        if (!RING_EFFECTS.has(effect) && !drivePreviewLoop) {
           await new Promise(r => setTimeout(r, frameDelay));
         }
       }
     } finally {
-      exportCanvas.__avatarSetRingLoopProgress?.(null);
-      exportCanvas.__avatarSetExportFrameStep?.(null);
+      if (drivePreviewLoop) {
+        exportCanvas.__avatarSetRingLoopProgress?.(null);
+        exportCanvas.__avatarSetExportFrameStep?.(null);
+      }
     }
 
     // Encode APNG — cnum=0 means auto colors
@@ -580,6 +614,7 @@ function App() {
     const w = canvas.width;
     const h = canvas.height;
     const exportCanvas = canvas as ExportDrivenCanvas;
+    const drivePreviewLoop = PREVIEW_LOOP_EFFECTS.has(effect);
     const ringRenderer = RING_EFFECTS.has(effect)
       ? createOfflineRingRenderer({
           width: w,
@@ -600,20 +635,22 @@ function App() {
 
     const frames: { data: Uint8Array; duration: number }[] = [];
     try {
-      if (RING_EFFECTS.has(effect) && !ringRenderer) {
+      if (drivePreviewLoop) {
         exportCanvas.__avatarSetExportFrameStep?.(frameDelay);
       }
 
       for (let i = 0; i < frameCount; i++) {
-        const ringProgress = getRingExportFrameProgress(effect, i, frameCount);
-        if (RING_EFFECTS.has(effect) && !ringRenderer) {
-          exportCanvas.__avatarSetRingLoopProgress?.(ringProgress);
+        const frameProgress = getRingExportFrameProgress(effect, i, frameCount);
+        if (drivePreviewLoop) {
+          exportCanvas.__avatarSetRingLoopProgress?.(frameProgress);
           exportCanvas.__avatarRenderFrame?.();
         }
 
         const sourceCanvas = RING_EFFECTS.has(effect)
-          ? (ringRenderer?.renderFrame(ringProgress, i * frameDelay) ?? exportCanvas.__avatarExtractFrame?.() ?? canvas)
-          : canvas;
+          ? (ringRenderer?.renderFrame(frameProgress, i * frameDelay) ?? exportCanvas.__avatarExtractFrame?.() ?? canvas)
+          : drivePreviewLoop
+            ? (exportCanvas.__avatarExtractFrame?.() ?? canvas)
+            : canvas;
 
         ctx.clearRect(0, 0, w, h);
         ctx.drawImage(sourceCanvas, 0, 0);
@@ -623,13 +660,15 @@ function App() {
         const imgData = ctx.getImageData(0, 0, w, h);
         frames.push({ data: new Uint8Array(imgData.data), duration: frameDelay });
         setExportProgress((i + 1) / frameCount * 0.7);
-        if (!RING_EFFECTS.has(effect)) {
+        if (!RING_EFFECTS.has(effect) && !drivePreviewLoop) {
           await new Promise(r => setTimeout(r, frameDelay));
         }
       }
     } finally {
-      exportCanvas.__avatarSetRingLoopProgress?.(null);
-      exportCanvas.__avatarSetExportFrameStep?.(null);
+      if (drivePreviewLoop) {
+        exportCanvas.__avatarSetRingLoopProgress?.(null);
+        exportCanvas.__avatarSetExportFrameStep?.(null);
+      }
     }
 
     setExportProgress(0.8);
