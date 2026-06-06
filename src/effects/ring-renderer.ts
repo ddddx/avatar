@@ -6,7 +6,7 @@ import {
 import type { CropShape, EffectParams, EffectType, MirrorSettings } from './types';
 import type { GifData } from '../lib/gif-decoder';
 
-const RING_EFFECTS = new Set<EffectType>(['solidring', 'disc', 'googleone', 'duotone', 'blinkring', 'linxudo', 'bounce', 'collapsequad', 'axisrings', 'loader', 'spinner']);
+const RING_EFFECTS = new Set<EffectType>(['solidring', 'disc', 'googleone', 'duotone', 'blinkring', 'linxudo', 'bounce', 'collapsequad', 'axisrings', 'loader', 'spinner', 'neoncomet', 'equalizer', 'magiccircle', 'cyberhud', 'crtglitch', 'portal', 'kaleidoscope']);
 const SOLID_RING_COLORS = ['#ff0040', '#ff8000', '#00ff80', '#00b0ff', '#ff0040'];
 const DISC_COLORS = ['#ff0040', '#ff8000', '#ffe000', '#00ff80', '#00b0ff', '#a040ff', '#ff0040'];
 const COLLAPSE_QUAD_COLORS = ['#EA4335', '#4285F4', '#34A853', '#FBBC05'] as const;
@@ -282,12 +282,116 @@ function fillCircle(
   x: number,
   y: number,
   radius: number,
-  fillStyle: string,
+  fillStyle: string | CanvasGradient | CanvasPattern,
 ) {
   ctx.beginPath();
   ctx.arc(x, y, radius, 0, Math.PI * 2);
   ctx.fillStyle = fillStyle;
   ctx.fill();
+}
+
+function pseudoRandom(index: number, seed = 0) {
+  const value = Math.sin(index * 12.9898 + seed * 78.233) * 43758.5453;
+  return value - Math.floor(value);
+}
+
+function getDirectedProgress(params: EffectParams, progress: number) {
+  return wrapUnit(progress * (params.direction === 'reverse' ? -1 : 1));
+}
+
+function getTrackSample(
+  shape: CropShape,
+  cx: number,
+  cy: number,
+  outerHalf: number,
+  half: number,
+  t: number,
+) {
+  if (shape === 'circle') {
+    const angle = wrapUnit(t) * Math.PI * 2;
+    const nx = Math.cos(angle);
+    const ny = Math.sin(angle);
+    return {
+      x: cx + nx * half,
+      y: cy + ny * half,
+      nx,
+      ny,
+    };
+  }
+
+  const cornerRadius = getSquareTrackCornerRadius(outerHalf, half);
+  const point = getRoundRectTrackPoint(cx, cy, half, cornerRadius, t);
+  const prev = getRoundRectTrackPoint(cx, cy, half, cornerRadius, t - 0.0015);
+  const next = getRoundRectTrackPoint(cx, cy, half, cornerRadius, t + 0.0015);
+  const tx = next.x - prev.x;
+  const ty = next.y - prev.y;
+  const length = Math.hypot(tx, ty) || 1;
+
+  return {
+    x: point.x,
+    y: point.y,
+    nx: ty / length,
+    ny: -tx / length,
+  };
+}
+
+function strokeTrackSegment(
+  ctx: CanvasRenderingContext2D,
+  shape: CropShape,
+  cx: number,
+  cy: number,
+  outerHalf: number,
+  half: number,
+  startT: number,
+  endT: number,
+) {
+  if (shape === 'circle') {
+    let from = wrapUnit(startT);
+    let to = endT;
+    while (to < from) to += 1;
+    ctx.arc(cx, cy, half, from * Math.PI * 2, to * Math.PI * 2);
+    return;
+  }
+
+  const cornerRadius = getSquareTrackCornerRadius(outerHalf, half);
+  traceRoundRectTrackSegment(ctx, cx, cy, half, cornerRadius, startT, endT);
+}
+
+function strokeShapeTrack(
+  ctx: CanvasRenderingContext2D,
+  shape: CropShape,
+  cx: number,
+  cy: number,
+  outerHalf: number,
+  half: number,
+) {
+  if (shape === 'circle') {
+    ctx.arc(cx, cy, half, 0, Math.PI * 2);
+    return;
+  }
+
+  const cornerRadius = getSquareTrackCornerRadius(outerHalf, half);
+  traceRoundedRectPath(ctx, cx - half, cy - half, half * 2, half * 2, cornerRadius);
+}
+
+function traceRegularPolygon(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  radius: number,
+  sides: number,
+  rotation: number,
+) {
+  for (let i = 0; i <= sides; i++) {
+    const angle = rotation + (i / sides) * Math.PI * 2;
+    const x = cx + Math.cos(angle) * radius;
+    const y = cy + Math.sin(angle) * radius;
+    if (i === 0) {
+      ctx.moveTo(x, y);
+    } else {
+      ctx.lineTo(x, y);
+    }
+  }
 }
 
 function drawCollapseQuadRing(
@@ -446,6 +550,452 @@ function drawSpinner(
     traceRoundRectTrackSegment(ctx, cx, cy, half, cornerRadius, startT, endT);
   }
   ctx.stroke();
+  ctx.restore();
+}
+
+function drawNeonComet(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  shape: CropShape,
+  params: EffectParams,
+  progress: number,
+) {
+  const cx = width / 2;
+  const cy = height / 2;
+  const size = Math.min(width, height);
+  const outerHalf = size / 2;
+  const ringWidth = 8 + (Math.max(1, Math.min(params.ringWidth, 100)) / 100) * 34;
+  const trackHalf = Math.max(outerHalf - ringWidth / 2 - 2, 8);
+  const phase = getDirectedProgress(params, progress);
+  const cometCount = Math.max(2, Math.round(2 + (params.density / 100) * 5));
+  const tailSteps = 22;
+  const tailLength = 0.08 + (params.intensity / 100) * 0.12;
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  ctx.beginPath();
+  strokeShapeTrack(ctx, shape, cx, cy, outerHalf, trackHalf);
+  ctx.strokeStyle = rgbaHexColor(params.color, 0.16);
+  ctx.lineWidth = Math.max(2, ringWidth * 0.16);
+  ctx.stroke();
+
+  for (let comet = 0; comet < cometCount; comet++) {
+    const head = phase + comet / cometCount;
+    const color = comet % 2 === 0 ? params.color : params.secondaryColor;
+
+    for (let step = tailSteps; step >= 0; step--) {
+      const a = step / tailSteps;
+      const t1 = head - tailLength * a;
+      const t2 = head - tailLength * Math.max(0, a - 1 / tailSteps);
+      const alpha = (1 - a) ** 1.6 * (0.16 + params.intensity / 220);
+      ctx.beginPath();
+      strokeTrackSegment(ctx, shape, cx, cy, outerHalf, trackHalf, t1, t2);
+      ctx.strokeStyle = rgbaHexColor(color, alpha);
+      ctx.lineWidth = ringWidth * (0.18 + (1 - a) * 0.42);
+      ctx.stroke();
+    }
+
+    const headPoint = getTrackSample(shape, cx, cy, outerHalf, trackHalf, head);
+    const headSize = ringWidth * 0.22 + (params.intensity / 100) * 5;
+    fillCircle(ctx, headPoint.x, headPoint.y, headSize * 2.4, rgbaHexColor(color, 0.16));
+    fillCircle(ctx, headPoint.x, headPoint.y, headSize, rgbaHexColor(color, 0.86));
+    fillCircle(ctx, headPoint.x, headPoint.y, headSize * 0.38, 'rgba(255, 255, 255, 0.92)');
+  }
+
+  ctx.restore();
+}
+
+function drawEqualizer(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  shape: CropShape,
+  params: EffectParams,
+  progress: number,
+) {
+  const cx = width / 2;
+  const cy = height / 2;
+  const size = Math.min(width, height);
+  const outerHalf = size / 2;
+  const ringWidth = 8 + (Math.max(1, Math.min(params.ringWidth, 100)) / 100) * 32;
+  const baseHalf = Math.max(outerHalf - ringWidth - 6, 10);
+  const phase = getDirectedProgress(params, progress) * Math.PI * 2;
+  const barCount = Math.max(28, Math.round(32 + params.density * 0.72));
+  const maxBar = 10 + (params.intensity / 100) * 54;
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.lineCap = 'round';
+
+  ctx.beginPath();
+  strokeShapeTrack(ctx, shape, cx, cy, outerHalf, baseHalf);
+  ctx.strokeStyle = rgbaHexColor(params.secondaryColor, 0.16);
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  for (let i = 0; i < barCount; i++) {
+    const t = i / barCount;
+    const beat =
+      0.42 +
+      0.28 * Math.sin(phase * 2 + i * 0.62) +
+      0.2 * Math.sin(phase * 3 - i * 0.37) +
+      0.1 * Math.sin(phase + i * 1.91);
+    const level = clampNumber(beat, 0.08, 1);
+    const length = 5 + maxBar * level;
+    const start = getTrackSample(shape, cx, cy, outerHalf, baseHalf, t);
+    const end = {
+      x: start.x + start.nx * length,
+      y: start.y + start.ny * length,
+    };
+    const colorBlend = 0.5 + 0.5 * Math.sin(phase + i * 0.2);
+
+    ctx.beginPath();
+    ctx.moveTo(start.x, start.y);
+    ctx.lineTo(end.x, end.y);
+    ctx.strokeStyle = colorBlend > 0.52
+      ? rgbaHexColor(params.color, 0.4 + level * 0.48)
+      : rgbaHexColor(params.secondaryColor, 0.36 + level * 0.42);
+    ctx.lineWidth = Math.max(2, ringWidth * 0.08 + level * ringWidth * 0.08);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+function drawMagicCircle(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  shape: CropShape,
+  params: EffectParams,
+  progress: number,
+) {
+  const cx = width / 2;
+  const cy = height / 2;
+  const size = Math.min(width, height);
+  const outerHalf = size / 2;
+  const phase = getDirectedProgress(params, progress);
+  const rotation = phase * Math.PI * 2;
+  const ringWidth = 6 + (Math.max(1, Math.min(params.ringWidth, 100)) / 100) * 24;
+  const radius = outerHalf - ringWidth * 1.7;
+  const glyphCount = Math.max(12, Math.round(12 + params.density * 0.32));
+
+  ctx.save();
+  clipShapePath(ctx, shape, width, height);
+  ctx.clip();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  for (let ring = 0; ring < 3; ring++) {
+    const half = Math.max(radius - ring * ringWidth * 1.15, 12);
+    ctx.beginPath();
+    strokeShapeTrack(ctx, shape, cx, cy, outerHalf, half);
+    ctx.strokeStyle = rgbaHexColor(ring % 2 === 0 ? params.color : params.secondaryColor, 0.18 + ring * 0.08);
+    ctx.lineWidth = 1.4 + ring * 0.7;
+    ctx.stroke();
+  }
+
+  ctx.beginPath();
+  traceRegularPolygon(ctx, cx, cy, radius * 0.68, 3, -rotation - Math.PI / 2);
+  ctx.strokeStyle = rgbaHexColor(params.secondaryColor, 0.4);
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  ctx.beginPath();
+  traceRegularPolygon(ctx, cx, cy, radius * 0.48, 6, rotation);
+  ctx.strokeStyle = rgbaHexColor(params.color, 0.34);
+  ctx.lineWidth = 1.2;
+  ctx.stroke();
+
+  for (let i = 0; i < glyphCount; i++) {
+    const t = i / glyphCount + phase;
+    const p = getTrackSample(shape, cx, cy, outerHalf, radius, t);
+    const glyph = 4 + pseudoRandom(i, 3) * 8;
+    const angle = Math.atan2(p.ny, p.nx) + Math.PI / 2;
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.rotate(angle);
+    ctx.strokeStyle = rgbaHexColor(i % 2 === 0 ? params.color : params.secondaryColor, 0.5);
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(-glyph * 0.5, 0);
+    ctx.lineTo(glyph * 0.5, 0);
+    if (i % 3 === 0) {
+      ctx.moveTo(0, -glyph * 0.35);
+      ctx.lineTo(0, glyph * 0.35);
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  const pulse = 0.5 + 0.5 * Math.sin(phase * Math.PI * 2);
+  fillCircle(ctx, cx, cy, size * (0.045 + pulse * 0.02), rgbaHexColor(params.color, 0.12 + pulse * 0.08));
+  ctx.restore();
+}
+
+function drawCyberHud(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  shape: CropShape,
+  params: EffectParams,
+  progress: number,
+) {
+  const cx = width / 2;
+  const cy = height / 2;
+  const size = Math.min(width, height);
+  const outerHalf = size / 2;
+  const phase = getDirectedProgress(params, progress);
+  const ringWidth = 6 + (Math.max(1, Math.min(params.ringWidth, 100)) / 100) * 24;
+  const radius = outerHalf - ringWidth;
+  const nodeCount = Math.max(8, Math.round(8 + params.density * 0.16));
+  const scan = phase;
+
+  ctx.save();
+  clipShapePath(ctx, shape, width, height);
+  ctx.clip();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.lineCap = 'round';
+
+  ctx.beginPath();
+  strokeShapeTrack(ctx, shape, cx, cy, outerHalf, radius);
+  ctx.strokeStyle = rgbaHexColor(params.color, 0.24);
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  for (let i = 0; i < 4; i++) {
+    const start = scan + i * 0.25;
+    ctx.beginPath();
+    strokeTrackSegment(ctx, shape, cx, cy, outerHalf, radius - i * 11, start, start + 0.07);
+    ctx.strokeStyle = rgbaHexColor(i % 2 === 0 ? params.color : params.secondaryColor, 0.68 - i * 0.08);
+    ctx.lineWidth = 2 + i * 0.4;
+    ctx.stroke();
+  }
+
+  const scanAngle = phase * Math.PI * 2;
+  ctx.beginPath();
+  ctx.moveTo(cx, cy);
+  ctx.lineTo(cx + Math.cos(scanAngle) * radius, cy + Math.sin(scanAngle) * radius);
+  ctx.strokeStyle = rgbaHexColor(params.secondaryColor, 0.42);
+  ctx.lineWidth = 1.4;
+  ctx.stroke();
+
+  for (let i = 0; i < nodeCount; i++) {
+    const t = i / nodeCount;
+    const p = getTrackSample(shape, cx, cy, outerHalf, radius - 18 * (i % 2), t);
+    const active = 0.35 + 0.65 * Math.max(0, Math.cos((t - scan) * Math.PI * 2));
+    fillCircle(ctx, p.x, p.y, 2.5 + active * 2.5, rgbaHexColor(i % 2 === 0 ? params.color : params.secondaryColor, 0.2 + active * 0.5));
+  }
+
+  const bracket = size * 0.18;
+  const inset = size * 0.13;
+  const corners = [
+    { x: inset, y: inset, sx: 1, sy: 1 },
+    { x: width - inset, y: inset, sx: -1, sy: 1 },
+    { x: width - inset, y: height - inset, sx: -1, sy: -1 },
+    { x: inset, y: height - inset, sx: 1, sy: -1 },
+  ];
+  ctx.strokeStyle = rgbaHexColor(params.color, 0.34);
+  ctx.lineWidth = 2;
+  for (const corner of corners) {
+    ctx.beginPath();
+    ctx.moveTo(corner.x, corner.y + corner.sy * bracket * 0.35);
+    ctx.lineTo(corner.x, corner.y);
+    ctx.lineTo(corner.x + corner.sx * bracket * 0.35, corner.y);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+function drawCrtGlitch(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  shape: CropShape,
+  params: EffectParams,
+  progress: number,
+) {
+  const phase = wrapUnit(progress);
+  const cycle = phase * Math.PI * 2;
+  const sliceCount = Math.max(5, Math.round(5 + params.density * 0.08));
+  const shiftMax = 2 + (params.intensity / 100) * 18;
+
+  ctx.save();
+  clipShapePath(ctx, shape, width, height);
+  ctx.clip();
+  ctx.globalCompositeOperation = 'screen';
+
+  if (params.intensity > 45) {
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.10)';
+    ctx.fillRect(0, 0, width, height);
+  }
+
+  const scanStep = 6;
+  for (let y = 0; y < height; y += scanStep) {
+    const alpha = 0.035 + 0.025 * (0.5 + 0.5 * Math.sin(cycle * 2 + y * 0.07));
+    ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+    ctx.fillRect(0, y, width, 1);
+  }
+
+  for (let i = 0; i < sliceCount; i++) {
+    const y = (pseudoRandom(i, 5) * height + phase * height * (1 + (i % 3))) % height;
+    const h = 4 + pseudoRandom(i, 7) * 22;
+    const offset = Math.sin(cycle * (1 + (i % 3)) + i * 1.7) * shiftMax * (0.35 + pseudoRandom(i, 8));
+    ctx.fillStyle = rgbaHexColor(i % 2 === 0 ? params.color : params.secondaryColor, 0.11 + params.intensity / 900);
+    ctx.fillRect(Math.min(0, offset), y, width + Math.abs(offset), h);
+    ctx.fillStyle = i % 2 === 0 ? 'rgba(255, 0, 80, 0.14)' : 'rgba(0, 220, 255, 0.14)';
+    ctx.fillRect(offset, y + h * 0.35, width, 1.5);
+  }
+
+  const roll = (phase * height) % height;
+  const gradient = ctx.createLinearGradient(0, roll - 40, 0, roll + 40);
+  gradient.addColorStop(0, 'rgba(255,255,255,0)');
+  gradient.addColorStop(0.5, rgbaHexColor(params.color, 0.2));
+  gradient.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, roll - 40, width, 80);
+  ctx.restore();
+}
+
+function drawPortal(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  shape: CropShape,
+  params: EffectParams,
+  progress: number,
+) {
+  const cx = width / 2;
+  const cy = height / 2;
+  const size = Math.min(width, height);
+  const outerHalf = size / 2;
+  const ringWidth = 8 + (Math.max(1, Math.min(params.ringWidth, 100)) / 100) * 34;
+  const phase = getDirectedProgress(params, progress) * Math.PI * 2;
+  const radius = outerHalf - ringWidth * 1.1;
+  const arms = 4 + Math.floor(params.density / 22);
+
+  ctx.save();
+  clipShapePath(ctx, shape, width, height);
+  ctx.clip();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.lineCap = 'round';
+
+  const glow = ctx.createRadialGradient(cx, cy, radius * 0.1, cx, cy, radius);
+  glow.addColorStop(0, rgbaHexColor(params.secondaryColor, 0.16));
+  glow.addColorStop(0.55, rgbaHexColor(params.color, 0.05));
+  glow.addColorStop(1, 'rgba(255,255,255,0)');
+  fillCircle(ctx, cx, cy, radius, glow);
+
+  for (let arm = 0; arm < arms; arm++) {
+    ctx.beginPath();
+    for (let s = 0; s <= 64; s++) {
+      const t = s / 64;
+      const r = radius * (0.18 + t * 0.78);
+      const angle = phase + arm * (Math.PI * 2 / arms) + t * 4.6;
+      const x = cx + Math.cos(angle) * r;
+      const y = cy + Math.sin(angle) * r;
+      if (s === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = rgbaHexColor(arm % 2 === 0 ? params.color : params.secondaryColor, 0.28 + params.intensity / 420);
+    ctx.lineWidth = 2.2;
+    ctx.stroke();
+  }
+
+  for (let i = 0; i < Math.round(18 + params.density * 0.28); i++) {
+    const lane = pseudoRandom(i, 11);
+    const t = wrapUnit(phase / (Math.PI * 2) + lane + i * 0.037);
+    const r = radius * (0.24 + 0.68 * t);
+    const angle = phase + i * 2.399 + t * 3.4;
+    const alpha = (1 - t) * 0.55;
+    fillCircle(
+      ctx,
+      cx + Math.cos(angle) * r,
+      cy + Math.sin(angle) * r,
+      1.3 + pseudoRandom(i, 12) * 2.2,
+      rgbaHexColor(i % 2 === 0 ? params.color : params.secondaryColor, alpha),
+    );
+  }
+
+  ctx.beginPath();
+  strokeShapeTrack(ctx, shape, cx, cy, outerHalf, radius);
+  ctx.strokeStyle = rgbaHexColor(params.color, 0.45);
+  ctx.lineWidth = Math.max(2, ringWidth * 0.12);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawKaleidoscope(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  shape: CropShape,
+  params: EffectParams,
+  progress: number,
+) {
+  const cx = width / 2;
+  const cy = height / 2;
+  const size = Math.min(width, height);
+  const radius = size / 2;
+  const phase = getDirectedProgress(params, progress);
+  const rotation = phase * Math.PI * 2;
+  const segmentCount = Math.max(6, Math.round(6 + params.density * 0.08));
+
+  ctx.save();
+  clipShapePath(ctx, shape, width, height);
+  ctx.clip();
+  ctx.globalCompositeOperation = 'screen';
+  ctx.translate(cx, cy);
+  ctx.rotate(rotation);
+
+  for (let i = 0; i < segmentCount; i++) {
+    const a1 = (i / segmentCount) * Math.PI * 2;
+    const a2 = ((i + 1) / segmentCount) * Math.PI * 2;
+    const color = i % 2 === 0 ? params.color : params.secondaryColor;
+    const alpha = 0.08 + (params.intensity / 100) * 0.08;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.arc(0, 0, radius, a1, a2);
+    ctx.closePath();
+    ctx.fillStyle = rgbaHexColor(color, alpha);
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(Math.cos(a1) * radius, Math.sin(a1) * radius);
+    ctx.strokeStyle = rgbaHexColor(color, 0.16 + params.intensity / 700);
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+  }
+
+  for (let ring = 0; ring < 4; ring++) {
+    const r = radius * (0.2 + ring * 0.16);
+    const sides = 3 + ring * 2;
+    ctx.beginPath();
+    traceRegularPolygon(ctx, 0, 0, r, sides, -rotation * (ring + 1));
+    ctx.strokeStyle = rgbaHexColor(ring % 2 === 0 ? params.color : params.secondaryColor, 0.22);
+    ctx.lineWidth = 1.1;
+    ctx.stroke();
+  }
+
+  for (let i = 0; i < Math.round(10 + params.density * 0.18); i++) {
+    const angle = i * 2.399 + rotation;
+    const r = radius * (0.12 + pseudoRandom(i, 13) * 0.72);
+    fillCircle(
+      ctx,
+      Math.cos(angle) * r,
+      Math.sin(angle) * r,
+      1.6 + pseudoRandom(i, 14) * 3,
+      rgbaHexColor(i % 2 === 0 ? params.color : params.secondaryColor, 0.36),
+    );
+  }
+
   ctx.restore();
 }
 
@@ -961,6 +1511,41 @@ export function createRingRenderer({
 
       if (effect === 'spinner') {
         drawSpinner(ctx, width, height, shape, params, progress);
+        return;
+      }
+
+      if (effect === 'neoncomet') {
+        drawNeonComet(ctx, width, height, shape, params, progress);
+        return;
+      }
+
+      if (effect === 'equalizer') {
+        drawEqualizer(ctx, width, height, shape, params, progress);
+        return;
+      }
+
+      if (effect === 'magiccircle') {
+        drawMagicCircle(ctx, width, height, shape, params, progress);
+        return;
+      }
+
+      if (effect === 'cyberhud') {
+        drawCyberHud(ctx, width, height, shape, params, progress);
+        return;
+      }
+
+      if (effect === 'crtglitch') {
+        drawCrtGlitch(ctx, width, height, shape, params, progress);
+        return;
+      }
+
+      if (effect === 'portal') {
+        drawPortal(ctx, width, height, shape, params, progress);
+        return;
+      }
+
+      if (effect === 'kaleidoscope') {
+        drawKaleidoscope(ctx, width, height, shape, params, progress);
         return;
       }
 

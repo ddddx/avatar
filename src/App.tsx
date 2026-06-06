@@ -24,7 +24,7 @@ import './App.css';
 const supportsMediaRecorder = typeof MediaRecorder !== 'undefined';
 const supportsWebWorkers = typeof Worker !== 'undefined';
 const GIF_TRANSPARENT_KEY = 0xff00ff;
-const RING_EFFECTS = new Set<EffectType>(['solidring', 'disc', 'googleone', 'duotone', 'blinkring', 'linxudo', 'bounce', 'collapsequad', 'axisrings', 'loader', 'spinner']);
+const RING_EFFECTS = new Set<EffectType>(['solidring', 'disc', 'googleone', 'duotone', 'blinkring', 'linxudo', 'bounce', 'collapsequad', 'axisrings', 'loader', 'spinner', 'neoncomet', 'equalizer', 'magiccircle', 'cyberhud', 'crtglitch', 'portal', 'kaleidoscope']);
 const TRANSPARENT_STAGE_EFFECTS = new Set<EffectType>(['bounce']);
 const EFFECT_LABELS: Record<EffectType, string> = {
   solidring: '实心环',
@@ -36,6 +36,13 @@ const EFFECT_LABELS: Record<EffectType, string> = {
   bounce: '弹跳头像',
   collapsequad: '收缩四色环',
   axisrings: '双轴圆环',
+  neoncomet: '霓虹彗星环',
+  equalizer: '频谱环',
+  magiccircle: '魔法阵',
+  cyberhud: '赛博 HUD',
+  crtglitch: 'CRT 故障',
+  portal: '传送门',
+  kaleidoscope: '万花筒',
   lightning: '闪电',
   fire: '火焰',
   glow: '炫光',
@@ -672,7 +679,7 @@ function App() {
           </div>
         </div>
         <div className="header-badges">
-          <span className="meta-pill">30 种特效</span>
+          <span className="meta-pill">37 种特效</span>
           <span className="meta-pill">圆外透明导出</span>
           <span className="meta-pill">GIF / APNG / WebP / WebM</span>
         </div>

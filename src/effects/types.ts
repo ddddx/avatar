@@ -1,6 +1,6 @@
 import type { Application, Container, Graphics } from 'pixi.js';
 
-export type EffectType = 'lightning' | 'fire' | 'glow' | 'orbit' | 'shield' | 'frost' | 'ripple' | 'petal' | 'stardust' | 'prism' | 'vortex' | 'firework' | 'gold' | 'spin' | 'loader' | 'spinner' | 'matrix' | 'bubble' | 'aurora' | 'firefly' | 'rain' | 'solidring' | 'disc' | 'googleone' | 'duotone' | 'blinkring' | 'linxudo' | 'bounce' | 'collapsequad' | 'axisrings';
+export type EffectType = 'lightning' | 'fire' | 'glow' | 'orbit' | 'shield' | 'frost' | 'ripple' | 'petal' | 'stardust' | 'prism' | 'vortex' | 'firework' | 'gold' | 'spin' | 'loader' | 'spinner' | 'matrix' | 'bubble' | 'aurora' | 'firefly' | 'rain' | 'solidring' | 'disc' | 'googleone' | 'duotone' | 'blinkring' | 'linxudo' | 'bounce' | 'collapsequad' | 'axisrings' | 'neoncomet' | 'equalizer' | 'magiccircle' | 'cyberhud' | 'crtglitch' | 'portal' | 'kaleidoscope';
 export type CropShape = 'circle' | 'square';
 export type RotationDirection = 'forward' | 'reverse';
 export type RingAnimationMode = 'rotate' | 'breathe';
@@ -137,4 +137,11 @@ export const EFFECT_PRESETS: Record<EffectType, Partial<EffectParams>> = {
   bounce:    { color: '#00d4ff', secondaryColor: '#ff6b35', density: 50, intensity: 50, speed: 50, size: 60, count: 1, ringAnimationMode: 'rotate', direction: 'forward' },
   collapsequad: { color: '#ea4335', secondaryColor: '#4285f4', density: 50, intensity: 62, speed: 50, ringWidth: 58, ringAnimationMode: 'rotate', direction: 'forward' },
   axisrings: { color: '#38bdf8', secondaryColor: '#f472b6', density: 50, intensity: 70, speed: 30, ringWidth: 46, ringAnimationMode: 'rotate', direction: 'forward' },
+  neoncomet: { color: '#22d3ee', secondaryColor: '#f472b6', density: 55, intensity: 72, speed: 48, ringWidth: 42, ringAnimationMode: 'rotate', direction: 'forward' },
+  equalizer: { color: '#34d399', secondaryColor: '#60a5fa', density: 64, intensity: 68, speed: 42, ringWidth: 50, ringAnimationMode: 'rotate', direction: 'forward' },
+  magiccircle: { color: '#a78bfa', secondaryColor: '#fbbf24', density: 58, intensity: 70, speed: 36, ringWidth: 44, ringAnimationMode: 'rotate', direction: 'forward' },
+  cyberhud: { color: '#22d3ee', secondaryColor: '#84cc16', density: 54, intensity: 66, speed: 44, ringWidth: 38, ringAnimationMode: 'rotate', direction: 'forward' },
+  crtglitch: { color: '#06b6d4', secondaryColor: '#f43f5e', density: 48, intensity: 70, speed: 52, ringAnimationMode: 'rotate', direction: 'forward' },
+  portal: { color: '#38bdf8', secondaryColor: '#a855f7', density: 62, intensity: 76, speed: 46, ringWidth: 48, ringAnimationMode: 'rotate', direction: 'forward' },
+  kaleidoscope: { color: '#f97316', secondaryColor: '#06b6d4', density: 62, intensity: 64, speed: 34, ringAnimationMode: 'rotate', direction: 'forward' },
 };

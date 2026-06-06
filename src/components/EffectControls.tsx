@@ -7,26 +7,34 @@ interface Props {
   onChange: (p: EffectParams) => void;
 }
 
-const DIRECTION_EFFECTS = new Set<EffectType>(['solidring', 'disc', 'googleone', 'duotone', 'linxudo', 'collapsequad']);
+const DIRECTION_EFFECTS = new Set<EffectType>([
+  'solidring', 'disc', 'googleone', 'duotone', 'linxudo', 'collapsequad', 'axisrings',
+  'neoncomet', 'equalizer', 'magiccircle', 'cyberhud', 'portal', 'kaleidoscope',
+]);
 const RING_EFFECTS = new Set<EffectType>(['solidring', 'disc', 'googleone', 'duotone', 'blinkring', 'linxudo', 'collapsequad']);
 const COLOR_EFFECTS = new Set<EffectType>([
   'lightning', 'fire', 'glow', 'orbit', 'shield', 'frost', 'ripple', 'petal', 'stardust', 'prism',
   'vortex', 'firework', 'gold', 'spin', 'loader', 'spinner', 'matrix', 'bubble', 'aurora', 'firefly',
-  'rain', 'solidring', 'disc', 'duotone', 'blinkring', 'axisrings',
+  'rain', 'solidring', 'disc', 'duotone', 'blinkring', 'axisrings', 'neoncomet', 'equalizer',
+  'magiccircle', 'cyberhud', 'crtglitch', 'portal', 'kaleidoscope',
 ]);
 const DENSITY_EFFECTS = new Set<EffectType>([
   'lightning', 'fire', 'glow', 'orbit', 'shield', 'frost', 'ripple', 'petal', 'stardust', 'prism',
   'vortex', 'firework', 'gold', 'spin', 'loader', 'spinner', 'matrix', 'bubble', 'aurora', 'firefly',
-  'rain', 'duotone',
+  'rain', 'duotone', 'neoncomet', 'equalizer', 'magiccircle', 'cyberhud', 'crtglitch',
+  'portal', 'kaleidoscope',
 ]);
 const INTENSITY_EFFECTS = new Set<EffectType>([
   'lightning', 'fire', 'glow', 'orbit', 'shield', 'frost', 'ripple', 'petal', 'stardust', 'prism',
   'vortex', 'firework', 'gold', 'spin', 'loader', 'spinner', 'matrix', 'bubble', 'aurora', 'firefly',
-  'rain', 'solidring', 'disc', 'googleone', 'duotone', 'blinkring',
+  'rain', 'solidring', 'disc', 'googleone', 'duotone', 'blinkring', 'neoncomet', 'equalizer',
+  'magiccircle', 'cyberhud', 'crtglitch', 'portal', 'kaleidoscope',
 ]);
 const SIZE_EFFECTS = new Set<EffectType>(['bounce']);
 const COUNT_EFFECTS = new Set<EffectType>(['bounce']);
-const RING_WIDTH_EFFECTS = new Set<EffectType>(['collapsequad', 'axisrings']);
+const RING_WIDTH_EFFECTS = new Set<EffectType>([
+  'collapsequad', 'axisrings', 'neoncomet', 'equalizer', 'magiccircle', 'cyberhud', 'portal',
+]);
 
 const EffectControls: React.FC<Props> = ({ effect, params, onChange }) => {
   const set = (key: keyof EffectParams, val: number | string) => {
