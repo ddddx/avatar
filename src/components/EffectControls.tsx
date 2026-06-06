@@ -13,14 +13,14 @@ const DIRECTION_EFFECTS = new Set<EffectType>([
 ]);
 const RING_EFFECTS = new Set<EffectType>(['solidring', 'disc', 'googleone', 'duotone', 'blinkring', 'linxudo', 'collapsequad']);
 const COLOR_EFFECTS = new Set<EffectType>([
-  'lightning', 'fire', 'glow', 'orbit', 'shield', 'frost', 'ripple', 'petal', 'stardust', 'prism',
+  'lightning', 'fire', 'glow', 'orbit', 'shield', 'frost', 'ripple', 'petal', 'stardust',
   'vortex', 'firework', 'gold', 'spin', 'loader', 'spinner', 'matrix', 'bubble', 'aurora', 'firefly',
-  'rain', 'solidring', 'disc', 'duotone', 'blinkring', 'axisrings', 'neoncomet', 'equalizer',
+  'rain', 'duotone', 'blinkring', 'axisrings', 'neoncomet', 'equalizer',
   'magiccircle', 'cyberhud', 'crtglitch', 'portal', 'kaleidoscope',
 ]);
 const DENSITY_EFFECTS = new Set<EffectType>([
   'lightning', 'fire', 'glow', 'orbit', 'shield', 'frost', 'ripple', 'petal', 'stardust', 'prism',
-  'vortex', 'firework', 'gold', 'spin', 'loader', 'spinner', 'matrix', 'bubble', 'aurora', 'firefly',
+  'vortex', 'firework', 'gold', 'spin', 'loader', 'matrix', 'bubble', 'aurora', 'firefly',
   'rain', 'duotone', 'neoncomet', 'equalizer', 'magiccircle', 'cyberhud', 'crtglitch',
   'portal', 'kaleidoscope',
 ]);

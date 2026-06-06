@@ -456,8 +456,9 @@ function drawLoader(
   const cx = width / 2;
   const cy = height / 2;
   const size = Math.min(width, height);
-  const dotCount = 3 + Math.floor(params.intensity / 25);
-  const orbitRadius = size * 0.25;
+  const intensity = params.intensity / 100;
+  const dotCount = Math.max(3, Math.round(3 + params.density * 0.06));
+  const orbitRadius = size * (0.2 + intensity * 0.1);
   const outerHalf = size / 2;
   const orbitHalf = Math.max(Math.min(orbitRadius, outerHalf - 12), 8);
   const phase = wrapUnit(progress) * Math.PI * 2;
@@ -466,20 +467,20 @@ function drawLoader(
   clipShapePath(ctx, shape, width, height);
   ctx.clip();
 
-  const centerAlpha = 0.06 + 0.04 * Math.sin(phase * 2);
+  const centerAlpha = 0.035 + intensity * 0.08 + 0.025 * Math.sin(phase * 2);
   fillCircle(ctx, cx, cy, size * 0.08, rgbaHexColor(params.color, centerAlpha));
 
   if (shape === 'circle') {
     ctx.beginPath();
     ctx.arc(cx, cy, orbitRadius, 0, Math.PI * 2);
-    ctx.strokeStyle = rgbaHexColor(params.color, 0.08);
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = rgbaHexColor(params.color, 0.05 + intensity * 0.08);
+    ctx.lineWidth = 0.8 + intensity * 1.2;
     ctx.stroke();
   } else {
     const cornerRadius = getSquareTrackCornerRadius(outerHalf, orbitHalf);
     traceRoundedRectPath(ctx, cx - orbitHalf, cy - orbitHalf, orbitHalf * 2, orbitHalf * 2, cornerRadius);
-    ctx.strokeStyle = rgbaHexColor(params.color, 0.08);
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = rgbaHexColor(params.color, 0.05 + intensity * 0.08);
+    ctx.lineWidth = 0.8 + intensity * 1.2;
     ctx.stroke();
   }
 
@@ -488,7 +489,7 @@ function drawLoader(
     const eased = dotPhase + Math.sin(dotPhase * 2) * 0.3;
     const color = index === 0 ? params.color : params.secondaryColor;
     const pulse = 0.7 + 0.3 * Math.sin(phase * 2 + index);
-    const dotSize = (3 + Math.sin(index) * 1.5) * pulse;
+    const dotSize = (2 + intensity * 3 + Math.sin(index) * 1.2) * pulse;
     const alpha = 0.4 + 0.6 * (0.5 + 0.5 * Math.sin(phase + index * 0.8));
     let x: number;
     let y: number;
@@ -680,6 +681,7 @@ function drawMagicCircle(
   const outerHalf = size / 2;
   const phase = getDirectedProgress(params, progress);
   const rotation = phase * Math.PI * 2;
+  const intensity = params.intensity / 100;
   const ringWidth = 6 + (Math.max(1, Math.min(params.ringWidth, 100)) / 100) * 24;
   const radius = outerHalf - ringWidth * 1.7;
   const glyphCount = Math.max(12, Math.round(12 + params.density * 0.32));
@@ -695,33 +697,33 @@ function drawMagicCircle(
     const half = Math.max(radius - ring * ringWidth * 1.15, 12);
     ctx.beginPath();
     strokeShapeTrack(ctx, shape, cx, cy, outerHalf, half);
-    ctx.strokeStyle = rgbaHexColor(ring % 2 === 0 ? params.color : params.secondaryColor, 0.18 + ring * 0.08);
-    ctx.lineWidth = 1.4 + ring * 0.7;
+    ctx.strokeStyle = rgbaHexColor(ring % 2 === 0 ? params.color : params.secondaryColor, 0.12 + intensity * 0.14 + ring * 0.07);
+    ctx.lineWidth = 1 + intensity * 1.4 + ring * 0.55;
     ctx.stroke();
   }
 
   ctx.beginPath();
   traceRegularPolygon(ctx, cx, cy, radius * 0.68, 3, -rotation - Math.PI / 2);
-  ctx.strokeStyle = rgbaHexColor(params.secondaryColor, 0.4);
-  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = rgbaHexColor(params.secondaryColor, 0.22 + intensity * 0.34);
+  ctx.lineWidth = 1 + intensity * 1.2;
   ctx.stroke();
 
   ctx.beginPath();
   traceRegularPolygon(ctx, cx, cy, radius * 0.48, 6, rotation);
-  ctx.strokeStyle = rgbaHexColor(params.color, 0.34);
-  ctx.lineWidth = 1.2;
+  ctx.strokeStyle = rgbaHexColor(params.color, 0.2 + intensity * 0.28);
+  ctx.lineWidth = 0.9 + intensity;
   ctx.stroke();
 
   for (let i = 0; i < glyphCount; i++) {
     const t = i / glyphCount + phase;
     const p = getTrackSample(shape, cx, cy, outerHalf, radius, t);
-    const glyph = 4 + pseudoRandom(i, 3) * 8;
+    const glyph = 3 + intensity * 5 + pseudoRandom(i, 3) * 7;
     const angle = Math.atan2(p.ny, p.nx) + Math.PI / 2;
     ctx.save();
     ctx.translate(p.x, p.y);
     ctx.rotate(angle);
-    ctx.strokeStyle = rgbaHexColor(i % 2 === 0 ? params.color : params.secondaryColor, 0.5);
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = rgbaHexColor(i % 2 === 0 ? params.color : params.secondaryColor, 0.28 + intensity * 0.42);
+    ctx.lineWidth = 0.7 + intensity * 0.8;
     ctx.beginPath();
     ctx.moveTo(-glyph * 0.5, 0);
     ctx.lineTo(glyph * 0.5, 0);
@@ -734,7 +736,7 @@ function drawMagicCircle(
   }
 
   const pulse = 0.5 + 0.5 * Math.sin(phase * Math.PI * 2);
-  fillCircle(ctx, cx, cy, size * (0.045 + pulse * 0.02), rgbaHexColor(params.color, 0.12 + pulse * 0.08));
+  fillCircle(ctx, cx, cy, size * (0.035 + intensity * 0.025 + pulse * 0.02), rgbaHexColor(params.color, 0.08 + intensity * 0.12 + pulse * 0.06));
   ctx.restore();
 }
 
@@ -751,10 +753,12 @@ function drawCyberHud(
   const size = Math.min(width, height);
   const outerHalf = size / 2;
   const phase = getDirectedProgress(params, progress);
+  const intensity = params.intensity / 100;
   const ringWidth = 6 + (Math.max(1, Math.min(params.ringWidth, 100)) / 100) * 24;
   const radius = outerHalf - ringWidth;
   const nodeCount = Math.max(8, Math.round(8 + params.density * 0.16));
   const scan = phase;
+  const scanCount = Math.max(2, Math.round(2 + intensity * 4));
 
   ctx.save();
   clipShapePath(ctx, shape, width, height);
@@ -764,16 +768,16 @@ function drawCyberHud(
 
   ctx.beginPath();
   strokeShapeTrack(ctx, shape, cx, cy, outerHalf, radius);
-  ctx.strokeStyle = rgbaHexColor(params.color, 0.24);
-  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = rgbaHexColor(params.color, 0.12 + intensity * 0.22);
+  ctx.lineWidth = 1 + intensity * 1.2;
   ctx.stroke();
 
-  for (let i = 0; i < 4; i++) {
-    const start = scan + i * 0.25;
+  for (let i = 0; i < scanCount; i++) {
+    const start = scan + i / scanCount;
     ctx.beginPath();
-    strokeTrackSegment(ctx, shape, cx, cy, outerHalf, radius - i * 11, start, start + 0.07);
-    ctx.strokeStyle = rgbaHexColor(i % 2 === 0 ? params.color : params.secondaryColor, 0.68 - i * 0.08);
-    ctx.lineWidth = 2 + i * 0.4;
+    strokeTrackSegment(ctx, shape, cx, cy, outerHalf, radius - i * 9, start, start + 0.045 + intensity * 0.055);
+    ctx.strokeStyle = rgbaHexColor(i % 2 === 0 ? params.color : params.secondaryColor, 0.26 + intensity * 0.48 - i * 0.04);
+    ctx.lineWidth = 1.3 + intensity * 1.5 + i * 0.22;
     ctx.stroke();
   }
 
@@ -781,15 +785,15 @@ function drawCyberHud(
   ctx.beginPath();
   ctx.moveTo(cx, cy);
   ctx.lineTo(cx + Math.cos(scanAngle) * radius, cy + Math.sin(scanAngle) * radius);
-  ctx.strokeStyle = rgbaHexColor(params.secondaryColor, 0.42);
-  ctx.lineWidth = 1.4;
+  ctx.strokeStyle = rgbaHexColor(params.secondaryColor, 0.18 + intensity * 0.42);
+  ctx.lineWidth = 0.9 + intensity * 1.3;
   ctx.stroke();
 
   for (let i = 0; i < nodeCount; i++) {
     const t = i / nodeCount;
     const p = getTrackSample(shape, cx, cy, outerHalf, radius - 18 * (i % 2), t);
     const active = 0.35 + 0.65 * Math.max(0, Math.cos((t - scan) * Math.PI * 2));
-    fillCircle(ctx, p.x, p.y, 2.5 + active * 2.5, rgbaHexColor(i % 2 === 0 ? params.color : params.secondaryColor, 0.2 + active * 0.5));
+    fillCircle(ctx, p.x, p.y, 1.8 + intensity * 2 + active * 2.5, rgbaHexColor(i % 2 === 0 ? params.color : params.secondaryColor, 0.12 + intensity * 0.18 + active * 0.5));
   }
 
   const bracket = size * 0.18;
@@ -800,8 +804,8 @@ function drawCyberHud(
     { x: width - inset, y: height - inset, sx: -1, sy: -1 },
     { x: inset, y: height - inset, sx: 1, sy: -1 },
   ];
-  ctx.strokeStyle = rgbaHexColor(params.color, 0.34);
-  ctx.lineWidth = 2;
+  ctx.strokeStyle = rgbaHexColor(params.color, 0.16 + intensity * 0.34);
+  ctx.lineWidth = 1.2 + intensity * 1.4;
   for (const corner of corners) {
     ctx.beginPath();
     ctx.moveTo(corner.x, corner.y + corner.sy * bracket * 0.35);

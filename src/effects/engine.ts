@@ -29,6 +29,10 @@ function lerpColor(a: string, b: string, t: number): number {
   return (r << 16) | (g << 8) | bv;
 }
 
+function mixHex(a: string, b: string, t: number): string {
+  return `#${lerpColor(a, b, t).toString(16).padStart(6, '0')}`;
+}
+
 function drawRingQuad(
   g: PIXI.Graphics,
   p1Outer: { x: number; y: number },
@@ -596,7 +600,7 @@ export class ParticleEngine {
         life: 3 + Math.random() * 5,
         maxLife: 8,
         size: 0.5 + Math.random() * 1,
-        color: '#ffffff',
+        color: Math.random() > 0.5 ? this.params.color : this.params.secondaryColor,
         alpha: 1,
         trail: [],
       });
@@ -617,16 +621,19 @@ export class ParticleEngine {
   }
 
   private drawLightning(g: PIXI.Graphics, _cw: number, _ch: number, _sz: number) {
+    const colorNum = hexToNum(this.params.color);
+    const secColorNum = hexToNum(this.params.secondaryColor);
+
     for (const bolt of this.lightningBolts) {
       const progress = bolt.life / bolt.maxLife;
       const fadeAlpha = progress < 0.3 ? progress / 0.3 : 1;
       const flashAlpha = progress > 0.7 ? 1 : 0.6 + Math.sin(progress * Math.PI * 8) * 0.4;
       const baseAlpha = fadeAlpha * flashAlpha * bolt.glow;
 
-      // 3-layer glow: outer (thick, low alpha) �?mid �?core (thin, high alpha)
+      // 3-layer glow: outer, mid, core.
       const layers = [
-        { width: 4, color: 0x4488ff, alpha: baseAlpha * 0.35 },
-        { width: 2, color: 0x88bbff, alpha: baseAlpha * 0.65 },
+        { width: 4, color: colorNum, alpha: baseAlpha * 0.35 },
+        { width: 2, color: secColorNum, alpha: baseAlpha * 0.65 },
         { width: 0.8, color: 0xffffff, alpha: baseAlpha * 1.0 },
       ];
 
@@ -661,26 +668,27 @@ export class ParticleEngine {
       const lastSeg = bolt.segments[bolt.segments.length - 1];
       if (firstSeg && lastSeg) {
         const glowAlpha = baseAlpha * 0.25;
-        g.circle(firstSeg.x1, firstSeg.y1, 22).fill({ color: 0x4488ff, alpha: glowAlpha });
-        g.circle(lastSeg.x2, lastSeg.y2, 22).fill({ color: 0x4488ff, alpha: glowAlpha });
+        g.circle(firstSeg.x1, firstSeg.y1, 22).fill({ color: colorNum, alpha: glowAlpha });
+        g.circle(lastSeg.x2, lastSeg.y2, 22).fill({ color: colorNum, alpha: glowAlpha });
       }
     }
 
     // Spark particles with trails
     for (const p of this.particles) {
       const a = p.life / p.maxLife;
+      const pColor = hexToNum(p.color);
       if (p.trail) {
         for (let i = 0; i < p.trail.length; i++) {
           const tp = p.trail[i];
           const ta = a * (i / p.trail.length) * 0.5;
           // Outer glow trail
-          g.circle(tp.x, tp.y, p.size * 1.5).fill({ color: 0xaaddff, alpha: ta * 0.3 });
+          g.circle(tp.x, tp.y, p.size * 1.5).fill({ color: pColor, alpha: ta * 0.3 });
           // Core trail
-          g.circle(tp.x, tp.y, p.size * 0.6).fill({ color: 0xaaddff, alpha: ta });
+          g.circle(tp.x, tp.y, p.size * 0.6).fill({ color: pColor, alpha: ta });
         }
       }
       // Outer glow
-      g.circle(p.x, p.y, p.size * 2).fill({ color: 0x88ccff, alpha: a * 0.3 });
+      g.circle(p.x, p.y, p.size * 2).fill({ color: pColor, alpha: a * 0.3 });
       // Bright core
       g.circle(p.x, p.y, p.size).fill({ color: 0xffffff, alpha: a });
     }
@@ -736,6 +744,11 @@ export class ParticleEngine {
 
   private drawFire(g: PIXI.Graphics, cw: number, ch: number, sz: number) {
     const cx = cw / 2, cy = ch / 2, r = sz / 2;
+    const mainColor = this.params.color;
+    const secondaryColor = this.params.secondaryColor;
+    const hotColor = mixHex(secondaryColor, '#ffffff', 0.4);
+    const midColor = mixHex(mainColor, secondaryColor, 0.45);
+    const emberColor = mixHex(mainColor, '#140000', 0.5);
 
     // Bottom glow circle
     const glowIntensity = 0.08 + (this.params.intensity / 100) * 0.06;
@@ -746,7 +759,7 @@ export class ParticleEngine {
       const t = i / gradSteps;
       const radius = r * 1.6 * t;
       const alpha = glowIntensity * 0.4 * (1 - t);
-      const color = lerpColor('#cc5018', '#aa3000', t);
+      const color = lerpColor(secondaryColor, mainColor, t);
       g.circle(cx, bottomY, radius).fill({ color, alpha });
     }
 
@@ -755,7 +768,7 @@ export class ParticleEngine {
       const t = i / gradSteps;
       const radius = (r + 30) * t;
       const alpha = glowIntensity * 0.3 * (1 - t) * 0.2;
-      g.circle(cx, cy, radius).fill({ color: 0xcc5800, alpha });
+      g.circle(cx, cy, radius).fill({ color: hexToNum(mainColor), alpha });
     }
 
     // Sort particles
@@ -775,13 +788,13 @@ export class ParticleEngine {
 
       let colorNum: number;
       if (lifeRatio > 0.7) {
-        colorNum = lerpColor('#ffcc66', '#ff9933', (lifeRatio - 0.7) / 0.3);
+        colorNum = lerpColor(hotColor, secondaryColor, (lifeRatio - 0.7) / 0.3);
       } else if (lifeRatio > 0.5) {
-        colorNum = lerpColor('#ff9933', '#ee6600', (lifeRatio - 0.5) / 0.2);
+        colorNum = lerpColor(secondaryColor, midColor, (lifeRatio - 0.5) / 0.2);
       } else if (lifeRatio > 0.3) {
-        colorNum = lerpColor('#ee6600', '#cc3300', (lifeRatio - 0.3) / 0.2);
+        colorNum = lerpColor(midColor, mainColor, (lifeRatio - 0.3) / 0.2);
       } else {
-        colorNum = lerpColor('#cc3300', '#881100', lifeRatio / 0.3);
+        colorNum = lerpColor(mainColor, emberColor, lifeRatio / 0.3);
       }
 
       // Layer 1: large heat glow
@@ -1357,16 +1370,22 @@ export class ParticleEngine {
     const speedStep = this.getSpeedStep();
     const spd = speedStep;
     const densityFactor = this.params.density / 50;
+    const intensity = this.params.intensity / 100;
+    const targetCrystals = Math.floor((18 + intensity * 28) * densityFactor);
+
+    if (this.frostCrystals.length > targetCrystals) {
+      this.frostCrystals.length = targetCrystals;
+    }
 
     // Spawn ice crystals at edge
-    while (this.frostCrystals.length < Math.floor(30 * densityFactor)) {
+    while (this.frostCrystals.length < targetCrystals) {
       const t = Math.random();
       const ep = this.getEdgePoint(cw, ch, sz, t);
       this.frostCrystals.push({
         x: ep.x, y: ep.y,
         angle: Math.random() * Math.PI * 2,
-        size: 2 + Math.random() * 4,
-        branchLen: 8 + Math.random() * 15,
+        size: 1.5 + intensity * 3 + Math.random() * 3,
+        branchLen: 6 + intensity * 14 + Math.random() * 12,
       });
     }
 
@@ -1380,9 +1399,9 @@ export class ParticleEngine {
         vy: (0.3 + Math.random() * 0.8) * spd,
         life: 200 + Math.random() * 200,
         maxLife: 400,
-        size: 1 + Math.random() * 2.5,
-        color: Math.random() > 0.5 ? '#e0f0ff' : '#b0d4ff',
-        alpha: 0.5 + Math.random() * 0.5,
+        size: 0.8 + intensity * 1.2 + Math.random() * 2.3,
+        color: Math.random() > 0.5 ? this.params.color : this.params.secondaryColor,
+        alpha: 0.35 + intensity * 0.35 + Math.random() * 0.3,
         rotAngle: Math.random() * Math.PI * 2,
         rotSpeed: (Math.random() - 0.5) * 0.03,
         flickerPhase: Math.random() * Math.PI * 2,
@@ -1401,9 +1420,9 @@ export class ParticleEngine {
         vy: (ep.ny * (-0.2 - Math.random() * 0.5) + (Math.random() - 0.5) * 0.2) * spd,
         life: 80 + Math.random() * 120,
         maxLife: 200,
-        size: 1 + Math.random() * 2,
-        color: '#88ccff',
-        alpha: 0.6 + Math.random() * 0.4,
+        size: 0.8 + intensity * 1.2 + Math.random() * 1.8,
+        color: Math.random() > 0.5 ? this.params.secondaryColor : this.params.color,
+        alpha: 0.45 + intensity * 0.35 + Math.random() * 0.2,
       });
     }
 
@@ -1422,13 +1441,16 @@ export class ParticleEngine {
 
   private drawFrost(g: PIXI.Graphics, cw: number, ch: number, sz: number) {
     const cx = cw / 2, cy = ch / 2, r = sz / 2;
+    const intensity = this.params.intensity / 100;
+    const colorNum = hexToNum(this.params.color);
+    const secColorNum = hexToNum(this.params.secondaryColor);
 
     // Background ice glow
-    const glowAlpha = 0.04 + Math.sin(this.time * 0.5) * 0.02;
+    const glowAlpha = 0.025 + intensity * 0.04 + Math.sin(this.time * 0.5) * 0.015;
     for (let i = 5; i >= 0; i--) {
       const t = i / 5;
       const radius = r * 0.8 + (r * 1.3 - r * 0.8) * t;
-      g.circle(cx, cy, radius).fill({ color: 0x88ccff, alpha: glowAlpha * (1 - t) });
+      g.circle(cx, cy, radius).fill({ color: secColorNum, alpha: glowAlpha * (1 - t) });
     }
 
     // Draw frost crystals (branching lines at edges)
@@ -1439,7 +1461,7 @@ export class ParticleEngine {
       const y2 = crystal.y + Math.sin(crystal.angle) * crystal.branchLen;
       g.moveTo(crystal.x, crystal.y);
       g.lineTo(x2, y2);
-      g.stroke({ width: 1, color: 0xcceeFF, alpha });
+      g.stroke({ width: 0.65 + intensity * 0.8, color: colorNum, alpha });
 
       // Sub-branches
       for (let i = 0; i < 2; i++) {
@@ -1450,7 +1472,7 @@ export class ParticleEngine {
         const subLen = crystal.branchLen * 0.4;
         g.moveTo(mx, my);
         g.lineTo(mx + Math.cos(subAngle) * subLen, my + Math.sin(subAngle) * subLen);
-        g.stroke({ width: 0.7, color: 0xaaddFF, alpha: alpha * 0.7 });
+        g.stroke({ width: 0.45 + intensity * 0.45, color: secColorNum, alpha: alpha * 0.7 });
       }
     }
 
@@ -1477,7 +1499,7 @@ export class ParticleEngine {
           const a2 = angle + (i / 6) * Math.PI * 2;
           g.moveTo(p.x, p.y);
           g.lineTo(p.x + Math.cos(a2) * armLen, p.y + Math.sin(a2) * armLen);
-          g.stroke({ width: 0.5, color: 0xffffff, alpha: a * 0.4 });
+          g.stroke({ width: 0.5, color: colorNum, alpha: a * 0.4 });
         }
       }
     }
@@ -1504,7 +1526,7 @@ export class ParticleEngine {
         life: 40 + Math.random() * 60,
         maxLife: 100,
         size: 0.8 + Math.random() * 1.5,
-        color: Math.random() > 0.5 ? '#88ddff' : '#ffffff',
+        color: Math.random() > 0.5 ? this.params.color : mixHex(this.params.secondaryColor, '#ffffff', 0.35),
         alpha: 0.4 + Math.random() * 0.6,
         flickerSpeed: 3 + Math.random() * 5,
         flickerPhase: Math.random() * Math.PI * 2,
@@ -1594,24 +1616,31 @@ export class ParticleEngine {
   private updatePetal(cw: number, ch: number, _sz: number) {
     const speedStep = this.getSpeedStep();
     this.petalTime += 0.016 * speedStep;
+    const intensity = this.params.intensity / 100;
 
     // Spawn petals from top (gradually ramp up)
     const warmup = Math.min(1, this.petalTime / 2);
     const spawnRate = Math.floor(this.params.density / 10) + 1;
-    const petalColors = ['#ffb6c1', '#ffc0cb', '#ff69b4', '#fff0f5', '#ffffff'];
+    const petalColors = [
+      this.params.color,
+      this.params.secondaryColor,
+      mixHex(this.params.color, this.params.secondaryColor, 0.5),
+      mixHex(this.params.secondaryColor, '#ffffff', 0.5),
+      '#ffffff',
+    ];
     for (let i = 0; i < spawnRate * warmup; i++) {
       this.particles.push({
         x: Math.random() * cw,
         y: -10 - Math.random() * 20,
-        vx: (Math.random() - 0.5) * 0.5,
-        vy: 0.5 + Math.random() * 1.2,
+        vx: (Math.random() - 0.5) * (0.35 + intensity * 0.45),
+        vy: 0.35 + intensity * 0.45 + Math.random() * (0.8 + intensity * 0.8),
         life: 200 + Math.random() * 300,
         maxLife: 500,
-        size: 3 + Math.random() * 4,
+        size: 2.2 + intensity * 2.8 + Math.random() * 4,
         color: petalColors[Math.floor(Math.random() * petalColors.length)],
-        alpha: 0.6 + Math.random() * 0.4,
+        alpha: 0.45 + intensity * 0.35 + Math.random() * 0.25,
         swayPhase: Math.random() * Math.PI * 2,
-        swaySpeed: 1 + Math.random() * 2,
+        swaySpeed: 0.8 + intensity * 1.1 + Math.random() * 2,
         rotAngle: Math.random() * Math.PI * 2,
         rotSpeed: (Math.random() - 0.5) * 0.02,
       });
@@ -1630,6 +1659,8 @@ export class ParticleEngine {
   }
 
   private drawPetal(g: PIXI.Graphics, _cw: number, _ch: number, _sz: number) {
+    const intensity = this.params.intensity / 100;
+
     for (const p of this.particles) {
       const lifeRatio = p.life / p.maxLife;
       const fadeIn = lifeRatio > 0.9 ? (1 - lifeRatio) / 0.1 : 1;
@@ -1659,7 +1690,7 @@ export class ParticleEngine {
       g.closePath();
       g.fill({ color: pColor, alpha: a * 0.8 });
       // Soft glow
-      g.circle(p.x, p.y, p.size * 2).fill({ color: pColor, alpha: a * 0.18 });
+      g.circle(p.x, p.y, p.size * (1.4 + intensity * 1.4)).fill({ color: pColor, alpha: a * (0.1 + intensity * 0.16) });
     }
   }
 
@@ -1671,13 +1702,17 @@ export class ParticleEngine {
     const speedStep = this.getSpeedStep();
     this.stardustTime += 0.016 * speedStep;
     const cx = cw / 2, cy = ch / 2;
+    const intensity = this.params.intensity / 100;
 
     // Maintain star particles around edge
-    const targetCount = Math.floor(this.params.density * 1.2) + 20;
+    const targetCount = Math.floor(this.params.density * (0.9 + intensity * 0.65)) + 20;
+    if (this.particles.length > targetCount) {
+      this.particles.length = targetCount;
+    }
     while (this.particles.length < targetCount) {
       const angle = Math.random() * Math.PI * 2;
       const dist = sz * 0.35 + Math.random() * sz * 0.3;
-      const isNebula = Math.random() < 0.15;
+      const isNebula = Math.random() < 0.08 + intensity * 0.14;
       let x: number;
       let y: number;
       if (this.shape === 'circle') {
@@ -1695,11 +1730,17 @@ export class ParticleEngine {
         vy: (Math.random() - 0.5) * 0.15,
         life: 300 + Math.random() * 500,
         maxLife: 800,
-        size: isNebula ? 10 + Math.random() * 20 : 0.5 + Math.random() * 2.5,
+        size: isNebula
+          ? 8 + intensity * 14 + Math.random() * (12 + intensity * 16)
+          : 0.4 + intensity * 1.2 + Math.random() * (1.2 + intensity * 1.8),
         color: isNebula
-          ? (Math.random() > 0.5 ? '#2a1a4e' : '#1a1a3e')
-          : (Math.random() > 0.5 ? '#aa88ff' : '#6644cc'),
-        alpha: isNebula ? 0.05 + Math.random() * 0.08 : 0.3 + Math.random() * 0.7,
+          ? (Math.random() > 0.5
+              ? mixHex(this.params.color, '#050014', 0.72)
+              : mixHex(this.params.secondaryColor, '#050014', 0.72))
+          : (Math.random() > 0.5 ? this.params.color : this.params.secondaryColor),
+        alpha: isNebula
+          ? 0.025 + intensity * 0.075 + Math.random() * 0.06
+          : 0.22 + intensity * 0.4 + Math.random() * 0.35,
         flickerSpeed: 1 + Math.random() * 4,
         flickerPhase: Math.random() * Math.PI * 2,
         angle,
@@ -1717,15 +1758,15 @@ export class ParticleEngine {
       if (side < 0.5) {
         mx = Math.random() * cw * 0.5;
         my = -10;
-        mvx = 2 + Math.random() * 3;
-        mvy = 1.5 + Math.random() * 2;
+        mvx = (2 + Math.random() * 3) * (0.75 + intensity * 0.75);
+        mvy = (1.5 + Math.random() * 2) * (0.75 + intensity * 0.75);
       } else {
         mx = cw + 10;
         my = Math.random() * ch * 0.3;
-        mvx = -(2 + Math.random() * 3);
-        mvy = 1.5 + Math.random() * 2;
+        mvx = -(2 + Math.random() * 3) * (0.75 + intensity * 0.75);
+        mvy = (1.5 + Math.random() * 2) * (0.75 + intensity * 0.75);
       }
-      this.meteors.push({ x: mx, y: my, vx: mvx, vy: mvy, life: 40, maxLife: 40, length: 15 + Math.random() * 20 });
+      this.meteors.push({ x: mx, y: my, vx: mvx, vy: mvy, life: 40, maxLife: 40, length: 12 + intensity * 24 + Math.random() * 18 });
     }
 
     // Update particles with slow rotation
@@ -1766,13 +1807,16 @@ export class ParticleEngine {
   }
 
   private drawStardust(g: PIXI.Graphics, _cw: number, _ch: number, _sz: number) {
+    const intensity = this.params.intensity / 100;
+    const colorNum = hexToNum(this.params.color);
+    const secColorNum = hexToNum(this.params.secondaryColor);
 
     // Background nebula glow
     for (const p of this.particles) {
       if (p.size > 8) {
         const a = p.alpha * (0.7 + Math.sin(this.stardustTime * 0.3 + (p.flickerPhase ?? 0)) * 0.3);
         const pColor = hexToNum(p.color);
-        g.circle(p.x, p.y, p.size).fill({ color: pColor, alpha: a });
+        g.circle(p.x, p.y, p.size * (0.8 + intensity * 0.45)).fill({ color: pColor, alpha: a });
       }
     }
 
@@ -1785,9 +1829,9 @@ export class ParticleEngine {
       const pColor = hexToNum(p.color);
 
       // Outer glow
-      g.circle(p.x, p.y, p.size * 3.5).fill({ color: pColor, alpha: a * 0.15 });
+      g.circle(p.x, p.y, p.size * (2.5 + intensity * 2.4)).fill({ color: pColor, alpha: a * (0.08 + intensity * 0.16) });
       // Core
-      g.circle(p.x, p.y, p.size).fill({ color: pColor, alpha: a * 0.8 });
+      g.circle(p.x, p.y, p.size).fill({ color: pColor, alpha: a * (0.55 + intensity * 0.35) });
       // Bright center
       g.circle(p.x, p.y, p.size * 0.3).fill({ color: 0xffffff, alpha: a * 1.0 });
     }
@@ -1801,12 +1845,12 @@ export class ParticleEngine {
         const px = m.x - m.vx * t * m.length * 0.15;
         const py = m.y - m.vy * t * m.length * 0.15;
         const segAlpha = a * (1 - t) * 0.6;
-        g.circle(px, py, 1.5 * (1 - t * 0.7)).fill({ color: 0xffffff, alpha: segAlpha });
-        g.circle(px, py, 3 * (1 - t * 0.7)).fill({ color: 0xaa88ff, alpha: segAlpha * 0.3 });
+        g.circle(px, py, (1.2 + intensity * 0.8) * (1 - t * 0.7)).fill({ color: 0xffffff, alpha: segAlpha });
+        g.circle(px, py, (2.4 + intensity * 2.2) * (1 - t * 0.7)).fill({ color: secColorNum, alpha: segAlpha * (0.2 + intensity * 0.2) });
       }
       // Head
-      g.circle(m.x, m.y, 2).fill({ color: 0xffffff, alpha: a });
-      g.circle(m.x, m.y, 5).fill({ color: 0xaa88ff, alpha: a * 0.3 });
+      g.circle(m.x, m.y, 1.5 + intensity * 1.2).fill({ color: 0xffffff, alpha: a });
+      g.circle(m.x, m.y, 4 + intensity * 3).fill({ color: colorNum, alpha: a * (0.22 + intensity * 0.18) });
     }
   }
 
@@ -1817,6 +1861,7 @@ export class ParticleEngine {
   private updatePrism(cw: number, ch: number, sz: number) {
     const speedStep = this.getSpeedStep();
     this.prismTime += 0.016 * speedStep;
+    const intensity = this.params.intensity / 100;
 
     // Rainbow colors cycling
     const rainbowColors = [0xff0000, 0xff8800, 0xffff00, 0x00ff00, 0x0088ff, 0x4400ff, 0x8800ff];
@@ -1831,13 +1876,13 @@ export class ParticleEngine {
       this.particles.push({
         x: ep.x + (Math.random() - 0.5) * 4,
         y: ep.y + (Math.random() - 0.5) * 4,
-        vx: -ep.nx * (0.5 + Math.random() * 1.5),
-        vy: -ep.ny * (0.5 + Math.random() * 1.5),
+        vx: -ep.nx * (0.35 + intensity * 0.9 + Math.random() * (0.9 + intensity * 1.3)),
+        vy: -ep.ny * (0.35 + intensity * 0.9 + Math.random() * (0.9 + intensity * 1.3)),
         life: 50 + Math.random() * 80,
         maxLife: 130,
-        size: 1.5 + Math.random() * 3,
+        size: 0.9 + intensity * 2.2 + Math.random() * (1.6 + intensity * 2.2),
         color: '#' + rainbowColors[colorIdx].toString(16).padStart(6, '0'),
-        alpha: 0.5 + Math.random() * 0.5,
+        alpha: 0.32 + intensity * 0.42 + Math.random() * 0.26,
         trail: [],
       });
     }
@@ -1859,35 +1904,36 @@ export class ParticleEngine {
   private drawPrism(g: PIXI.Graphics, cw: number, ch: number, sz: number) {
     const cx = cw / 2, cy = ch / 2, r = sz / 2;
     const time = this.prismTime;
+    const intensity = this.params.intensity / 100;
     const rainbowColors = [0xff0000, 0xff8800, 0xffff00, 0x00ff00, 0x0088ff, 0x4400ff, 0x8800ff];
 
     // Prismatic light rays from edge
     const rayCount = 7;
     for (let i = 0; i < rayCount; i++) {
       const baseAngle = (i / rayCount) * Math.PI * 2 + time * 0.2;
-      const rayLen = r * 0.4 + Math.sin(time * 2 + i) * r * 0.1;
+      const rayLen = r * (0.28 + intensity * 0.22) + Math.sin(time * 2 + i) * r * (0.06 + intensity * 0.08);
       const innerR = r * 0.6;
       const x1 = cx + Math.cos(baseAngle) * innerR;
       const y1 = cy + Math.sin(baseAngle) * innerR;
       const x2 = cx + Math.cos(baseAngle) * (innerR + rayLen);
       const y2 = cy + Math.sin(baseAngle) * (innerR + rayLen);
-      const alpha = 0.25 + Math.sin(time * 3 + i * 0.8) * 0.15;
+      const alpha = 0.12 + intensity * 0.32 + Math.sin(time * 3 + i * 0.8) * (0.08 + intensity * 0.08);
 
       g.moveTo(x1, y1);
       g.lineTo(x2, y2);
-      g.stroke({ width: 2.5, color: rainbowColors[i], alpha });
+      g.stroke({ width: 1.4 + intensity * 2.2, color: rainbowColors[i], alpha });
 
       // Glow around ray
       const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
-      g.circle(mx, my, 8).fill({ color: rainbowColors[i], alpha: alpha * 0.25 });
+      g.circle(mx, my, 5 + intensity * 8).fill({ color: rainbowColors[i], alpha: alpha * (0.16 + intensity * 0.16) });
     }
 
     // Prismatic halo
     for (let i = 0; i < 7; i++) {
       const t = (time * 0.5 + i / 7) % 1;
       const haloR = r * 0.55 + t * r * 0.25;
-      const alpha = 0.08 * (1 - t);
-      g.circle(cx, cy, haloR).stroke({ width: 1.5, color: rainbowColors[i], alpha });
+      const alpha = (0.04 + intensity * 0.08) * (1 - t);
+      g.circle(cx, cy, haloR).stroke({ width: 0.8 + intensity * 1.4, color: rainbowColors[i], alpha });
     }
 
     // White incoming beam
@@ -1895,7 +1941,7 @@ export class ParticleEngine {
     const beamLen = r * 1.1;
     g.moveTo(cx - Math.cos(beamAngle) * beamLen, cy - Math.sin(beamAngle) * beamLen);
     g.lineTo(cx + Math.cos(beamAngle) * r * 0.3, cy + Math.sin(beamAngle) * r * 0.3);
-    g.stroke({ width: 2, color: 0xffffff, alpha: 0.2 + Math.sin(time) * 0.1 });
+    g.stroke({ width: 1 + intensity * 2.2, color: 0xffffff, alpha: 0.08 + intensity * 0.2 + Math.sin(time) * 0.08 });
 
     // Particles with trails
     for (const p of this.particles) {
@@ -1911,9 +1957,9 @@ export class ParticleEngine {
         }
       }
 
-      g.circle(p.x, p.y, p.size * 1.8).fill({ color: pColor, alpha: a * 0.15 });
-      g.circle(p.x, p.y, p.size).fill({ color: pColor, alpha: a * 0.8 });
-      g.circle(p.x, p.y, p.size * 0.3).fill({ color: 0xffffff, alpha: a * 0.6 });
+      g.circle(p.x, p.y, p.size * (1.4 + intensity)).fill({ color: pColor, alpha: a * (0.08 + intensity * 0.16) });
+      g.circle(p.x, p.y, p.size).fill({ color: pColor, alpha: a * (0.55 + intensity * 0.35) });
+      g.circle(p.x, p.y, p.size * 0.3).fill({ color: 0xffffff, alpha: a * (0.35 + intensity * 0.35) });
     }
   }
 
@@ -2044,6 +2090,7 @@ export class ParticleEngine {
   private updateFirework(cw: number, ch: number, sz: number) {
     const speedStep = this.getSpeedStep();
     this.fireworkTimer += speedStep;
+    const intensity = this.params.intensity / 100;
 
     // Spawn new firework burst
     const burstInterval = Math.max(20, 80 - Math.floor(this.params.density / 2));
@@ -2064,7 +2111,15 @@ export class ParticleEngine {
       }
       const burstParticles: Particle[] = [];
       const particleCount = 15 + Math.floor(this.params.intensity / 3);
-      const burstColors = ['#ff4466', '#ffaa00', '#44ff88', '#4488ff', '#ff44ff', '#ffff44', '#ffffff'];
+      const burstColors = [
+        this.params.color,
+        this.params.secondaryColor,
+        mixHex(this.params.color, this.params.secondaryColor, 0.35),
+        mixHex(this.params.color, this.params.secondaryColor, 0.65),
+        mixHex(this.params.color, '#ffffff', 0.45),
+        mixHex(this.params.secondaryColor, '#ffffff', 0.45),
+        '#ffffff',
+      ];
       const burstColor = burstColors[Math.floor(Math.random() * burstColors.length)];
       const burstColor2 = burstColors[Math.floor(Math.random() * burstColors.length)];
 
@@ -2078,9 +2133,9 @@ export class ParticleEngine {
           vy: Math.sin(angle) * speed,
           life: 40 + Math.random() * 30,
           maxLife: 70,
-          size: 1.5 + Math.random() * 2,
+          size: 1.1 + intensity * 1.2 + Math.random() * (1.2 + intensity * 1.4),
           color: Math.random() > 0.4 ? burstColor : burstColor2,
-          alpha: 0.8 + Math.random() * 0.2,
+          alpha: 0.55 + intensity * 0.3 + Math.random() * 0.15,
           trail: [],
         });
       }
@@ -2152,22 +2207,33 @@ export class ParticleEngine {
   private updateGold(cw: number, ch: number, _sz: number) {
     const speedStep = this.getSpeedStep();
     this.goldTime += 0.016 * speedStep;
+    const intensity = this.params.intensity / 100;
 
     // Spawn gold particles from top
     const spawnRate = Math.floor(this.params.density / 8) + 2;
-    const goldColors = ['#ffd700', '#ffec8b', '#daa520', '#ffffff'];
+    const goldColors = [
+      this.params.color,
+      this.params.secondaryColor,
+      mixHex(this.params.color, this.params.secondaryColor, 0.45),
+      mixHex(this.params.secondaryColor, '#ffffff', 0.5),
+      '#ffffff',
+    ];
     for (let i = 0; i < spawnRate; i++) {
       const isDust = Math.random() < 0.4;
       this.particles.push({
         x: Math.random() * cw,
         y: -5 - Math.random() * 15,
-        vx: (Math.random() - 0.5) * 0.4,
-        vy: 0.4 + Math.random() * 1.0,
+        vx: (Math.random() - 0.5) * (0.25 + intensity * 0.35),
+        vy: 0.3 + intensity * 0.35 + Math.random() * (0.7 + intensity * 0.7),
         life: 150 + Math.random() * 250,
         maxLife: 400,
-        size: isDust ? 0.5 + Math.random() * 1 : 2 + Math.random() * 3.5,
+        size: isDust
+          ? 0.35 + intensity * 0.65 + Math.random() * 1
+          : 1.4 + intensity * 2.2 + Math.random() * 3.2,
         color: goldColors[Math.floor(Math.random() * goldColors.length)],
-        alpha: isDust ? 0.3 + Math.random() * 0.4 : 0.6 + Math.random() * 0.4,
+        alpha: isDust
+          ? 0.22 + intensity * 0.24 + Math.random() * 0.3
+          : 0.42 + intensity * 0.38 + Math.random() * 0.2,
         flickerSpeed: 4 + Math.random() * 8,
         flickerPhase: Math.random() * Math.PI * 2,
         swayPhase: Math.random() * Math.PI * 2,
@@ -2187,10 +2253,12 @@ export class ParticleEngine {
   private drawGold(g: PIXI.Graphics, cw: number, ch: number, sz: number) {
     // Background warm glow
     const cx = cw / 2, cy = ch / 2, r = sz / 2;
-    const glowAlpha = 0.02 + Math.sin(this.goldTime * 1.5) * 0.01;
+    const intensity = this.params.intensity / 100;
+    const glowAlpha = 0.012 + intensity * 0.025 + Math.sin(this.goldTime * 1.5) * 0.01;
+    const colorNum = hexToNum(this.params.color);
     for (let i = 4; i >= 0; i--) {
       const t = i / 4;
-      g.circle(cx, cy, r * (0.6 + t * 0.5)).fill({ color: 0xffd700, alpha: glowAlpha * (1 - t) });
+      g.circle(cx, cy, r * (0.6 + t * 0.5)).fill({ color: colorNum, alpha: glowAlpha * (1 - t) });
     }
 
     for (const p of this.particles) {
@@ -2202,9 +2270,9 @@ export class ParticleEngine {
       const pColor = hexToNum(p.color);
 
       // Outer glow
-      g.circle(p.x, p.y, p.size * 3.5).fill({ color: pColor, alpha: a * 0.14 });
+      g.circle(p.x, p.y, p.size * (2.4 + intensity * 2.4)).fill({ color: pColor, alpha: a * (0.08 + intensity * 0.14) });
       // Core
-      g.circle(p.x, p.y, p.size).fill({ color: pColor, alpha: a * 0.8 });
+      g.circle(p.x, p.y, p.size).fill({ color: pColor, alpha: a * (0.56 + intensity * 0.32) });
       // Bright center
       g.circle(p.x, p.y, p.size * 0.3).fill({ color: 0xffffff, alpha: a * 0.95 });
     }
@@ -2415,7 +2483,7 @@ export class ParticleEngine {
 
   private updateMatrix(cw: number, _ch: number, sz: number) {
     this.matrixTimer += 0.016 * (this.params.speed / 50);
-    const colWidth = 12;
+    const colWidth = 18 - (this.params.density / 100) * 10;
     const cx = cw / 2;
     // In circle mode, constrain columns to the inscribed circle
     const r = sz / 2;
@@ -2427,10 +2495,11 @@ export class ParticleEngine {
       startX = cx - sz / 2;
       endX = cx + sz / 2;
     }
-    const colCount = Math.floor((endX - startX) / colWidth);
+    const colCount = Math.max(1, Math.floor((endX - startX) / colWidth));
 
     // Initialize columns
-    if (this.matrixColumns.length === 0) {
+    if (this.matrixColumns.length !== colCount) {
+      this.matrixColumns = [];
       for (let i = 0; i < colCount; i++) {
         const charCount = 5 + Math.floor(Math.random() * 15);
         const chars = Array.from({ length: charCount }, () =>
@@ -2457,14 +2526,17 @@ export class ParticleEngine {
     const topY = cy - r;
     const bottomY = cy + r;
     const charH = 14;
+    const intensity = this.params.intensity / 100;
     const greenNum = hexToNum(this.params.color);
     const darkGreenNum = hexToNum(this.params.secondaryColor);
+    const textAlphaScale = 0.45 + intensity * 0.55;
+    const backgroundAlpha = 0.12 + intensity * 0.28;
 
     // Background tint (circle or rect)
     if (this.shape === 'circle') {
-      g.circle(cx, cy, r).fill({ color: 0x000000, alpha: 0.3 });
+      g.circle(cx, cy, r).fill({ color: 0x000000, alpha: backgroundAlpha });
     } else {
-      g.roundRect(cx - r, topY, sz, sz, SQUARE_CORNER_RADIUS).fill({ color: 0x000000, alpha: 0.3 });
+      g.roundRect(cx - r, topY, sz, sz, SQUARE_CORNER_RADIUS).fill({ color: 0x000000, alpha: backgroundAlpha });
     }
 
     for (const col of this.matrixColumns) {
@@ -2480,11 +2552,11 @@ export class ParticleEngine {
         // Varying character sizes for visual interest
         const charW = 4 + (col.chars[i]?.charCodeAt(0) % 3) * 1.5;
         const charH2 = 8 + (col.chars[i]?.charCodeAt(0) % 4) * 2;
-        g.rect(col.x - charW / 2, y - charH2 / 2, charW, charH2).fill({ color, alpha: alpha * 0.8 });
+        g.rect(col.x - charW / 2, y - charH2 / 2, charW, charH2).fill({ color, alpha: alpha * 0.8 * textAlphaScale });
         // Bright head with glow
         if (isHead) {
-          g.circle(col.x, y, 8).fill({ color: greenNum, alpha: 0.25 });
-          g.circle(col.x, y, 4).fill({ color: 0xffffff, alpha: 0.8 });
+          g.circle(col.x, y, 4 + intensity * 8).fill({ color: greenNum, alpha: 0.12 + intensity * 0.28 });
+          g.circle(col.x, y, 2.5 + intensity * 2.5).fill({ color: 0xffffff, alpha: 0.45 + intensity * 0.45 });
         }
       }
     }
