@@ -1,6 +1,6 @@
 import type { Application, Container, Graphics } from 'pixi.js';
 
-export type EffectType = 'lightning' | 'fire' | 'glow' | 'orbit' | 'shield' | 'frost' | 'ripple' | 'petal' | 'stardust' | 'prism' | 'vortex' | 'firework' | 'gold' | 'spin' | 'loader' | 'spinner' | 'matrix' | 'bubble' | 'aurora' | 'firefly' | 'rain' | 'solidring' | 'disc' | 'googleone' | 'duotone' | 'blinkring' | 'linxudo' | 'bounce' | 'collapsequad' | 'axisrings' | 'neoncomet' | 'equalizer' | 'magiccircle' | 'cyberhud' | 'crtglitch' | 'portal' | 'kaleidoscope';
+export type EffectType = 'lightning' | 'fire' | 'glow' | 'orbit' | 'shield' | 'frost' | 'ripple' | 'petal' | 'stardust' | 'prism' | 'vortex' | 'firework' | 'gold' | 'spin' | 'loader' | 'spinner' | 'matrix' | 'bubble' | 'aurora' | 'firefly' | 'rain' | 'solidring' | 'disc' | 'googleone' | 'duotone' | 'blinkring' | 'linxudo' | 'bounce' | 'collapsequad' | 'axisrings' | 'neoncomet' | 'equalizer' | 'magiccircle' | 'cyberhud' | 'crtglitch' | 'portal' | 'kaleidoscope' | 'morphshapes';
 export type CropShape = 'circle' | 'square';
 export type RotationDirection = 'forward' | 'reverse';
 export type RingAnimationMode = 'rotate' | 'breathe';
@@ -144,4 +144,5 @@ export const EFFECT_PRESETS: Record<EffectType, Partial<EffectParams>> = {
   crtglitch: { color: '#06b6d4', secondaryColor: '#f43f5e', density: 48, intensity: 70, speed: 52, ringAnimationMode: 'rotate', direction: 'forward' },
   portal: { color: '#38bdf8', secondaryColor: '#a855f7', density: 62, intensity: 76, speed: 46, ringWidth: 48, ringAnimationMode: 'rotate', direction: 'forward' },
   kaleidoscope: { color: '#f97316', secondaryColor: '#06b6d4', density: 62, intensity: 64, speed: 34, ringAnimationMode: 'rotate', direction: 'forward' },
+  morphshapes: { color: '#14b8a6', secondaryColor: '#f43f5e', density: 72, intensity: 68, speed: 18, ringWidth: 46, ringAnimationMode: 'rotate', direction: 'forward' },
 };

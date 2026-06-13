@@ -54,6 +54,7 @@ const effectsByCategory: Record<EffectCategory, { type: EffectType; icon: string
     { type: 'bubble',    icon: '🫧', label: '气泡' },
     { type: 'firefly',   icon: '🪲', label: '萤火虫' },
     { type: 'rain',      icon: '🌧️', label: '雨' },
+    { type: 'morphshapes', icon: '◇', label: '多形变换' },
   ],
   tech: [
     { type: 'matrix',    icon: '🟢', label: '矩阵雨' },

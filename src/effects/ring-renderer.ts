@@ -6,7 +6,7 @@ import {
 import type { CropShape, EffectParams, EffectType, MirrorSettings } from './types';
 import type { GifData } from '../lib/gif-decoder';
 
-const RING_EFFECTS = new Set<EffectType>(['solidring', 'disc', 'googleone', 'duotone', 'blinkring', 'linxudo', 'bounce', 'collapsequad', 'axisrings', 'loader', 'spinner', 'neoncomet', 'equalizer', 'magiccircle', 'cyberhud', 'crtglitch', 'portal', 'kaleidoscope']);
+const RING_EFFECTS = new Set<EffectType>(['solidring', 'disc', 'googleone', 'duotone', 'blinkring', 'linxudo', 'bounce', 'collapsequad', 'axisrings', 'loader', 'spinner', 'neoncomet', 'equalizer', 'magiccircle', 'cyberhud', 'crtglitch', 'portal', 'kaleidoscope', 'morphshapes']);
 const SOLID_RING_COLORS = ['#ff0040', '#ff8000', '#00ff80', '#00b0ff', '#ff0040'];
 const DISC_COLORS = ['#ff0040', '#ff8000', '#ffe000', '#00ff80', '#00b0ff', '#a040ff', '#ff0040'];
 const COLLAPSE_QUAD_COLORS = ['#EA4335', '#4285F4', '#34A853', '#FBBC05'] as const;
@@ -17,6 +17,7 @@ const GOOGLE_ONE_SEGMENTS = [
   { color: '#FBBC05', degrees: 45 },
 ] as const;
 const SMOOTH_GRADIENT_SAMPLES = 256;
+const MORPH_SHAPE_SEQUENCE = ['circle', 'star5', 'triangle', 'octagon', 'diamond', 'cross', 'hexagon', 'square', 'star4', 'pentagon', 'bevel'] as const;
 
 export function isRingEffect(effect: EffectType) {
   return RING_EFFECTS.has(effect);
@@ -1005,6 +1006,236 @@ function drawKaleidoscope(
   ctx.restore();
 }
 
+type MorphShapeProfile = typeof MORPH_SHAPE_SEQUENCE[number];
+
+type MorphShapeFrame = {
+  from: MorphShapeProfile;
+  to: MorphShapeProfile;
+  blend: number;
+  segmentIndex: number;
+  local: number;
+  shapeCount: number;
+};
+
+function smoothStep(value: number) {
+  return value * value * (3 - value * 2);
+}
+
+function getMorphShapeCount(density: number) {
+  return Math.max(7, Math.min(MORPH_SHAPE_SEQUENCE.length, Math.round(7 + density * 0.045)));
+}
+
+function getMorphSegmentWeight(index: number) {
+  return 0.34 + pseudoRandom(index, 41) ** 2.4 * 3.4;
+}
+
+function getMorphTotalWeight(shapeCount: number) {
+  let total = 0;
+  for (let i = 0; i < shapeCount; i++) {
+    total += getMorphSegmentWeight(i);
+  }
+  return total;
+}
+
+function getMorphHoldRatio(index: number) {
+  return 0.08 + pseudoRandom(index, 42) * 0.42;
+}
+
+function easeMorphTransition(value: number, index: number) {
+  const t = clampNumber(value, 0, 1);
+  const inCurve = 0.42 + pseudoRandom(index, 43) * 2.4;
+  const outCurve = 0.45 + pseudoRandom(index, 44) * 2.6;
+  const eased = t < 0.5
+    ? 0.5 * Math.pow(t * 2, inCurve)
+    : 1 - 0.5 * Math.pow((1 - t) * 2, outCurve);
+  const drift = Math.sin(t * Math.PI) * (pseudoRandom(index, 45) - 0.5) * 0.18;
+
+  return clampNumber(eased + drift, 0, 1);
+}
+
+function getMorphScale(frame: MorphShapeFrame) {
+  const fromScale = 0.94 + pseudoRandom(frame.segmentIndex, 46) * 0.12;
+  const toScale = 0.94 + pseudoRandom((frame.segmentIndex + 1) % frame.shapeCount, 46) * 0.12;
+
+  return fromScale + (toScale - fromScale) * frame.blend;
+}
+
+function getMorphRotation(frame: MorphShapeFrame) {
+  let totalRotationWeight = 0;
+  let elapsedRotationWeight = 0;
+
+  for (let i = 0; i < frame.shapeCount; i++) {
+    const weight = 0.12 + pseudoRandom(i, 47) ** 2 * 3.6;
+    totalRotationWeight += weight;
+    if (i < frame.segmentIndex) {
+      elapsedRotationWeight += weight;
+    }
+  }
+
+  const currentWeight = 0.12 + pseudoRandom(frame.segmentIndex, 47) ** 2 * 3.6;
+  const localEase = smoothStep(frame.local);
+  const wobble = Math.sin(frame.local * Math.PI)
+    * Math.sin(frame.local * Math.PI * 2 + pseudoRandom(frame.segmentIndex, 48) * Math.PI * 2)
+    * (0.1 + pseudoRandom(frame.segmentIndex, 49) * 0.16);
+  const segmentRotation = clampNumber(localEase + wobble, 0, 1);
+  const rotationUnits = (elapsedRotationWeight + currentWeight * segmentRotation) / totalRotationWeight;
+
+  return rotationUnits * Math.PI * 2 * 2;
+}
+
+function getRegularPolygonRatio(sides: number, angle: number, rotation = 0) {
+  const sector = (Math.PI * 2) / sides;
+  const local = ((angle - rotation + sector / 2) % sector + sector) % sector - sector / 2;
+  return Math.cos(Math.PI / sides) / Math.cos(local);
+}
+
+function getStarRatio(points: number, angle: number, rotation: number, innerRatio: number) {
+  const ray = Math.max(0, Math.cos((angle - rotation) * points));
+  return innerRatio + (1 - innerRatio) * ray ** 0.58;
+}
+
+function clampMorphRatio(value: number) {
+  return clampNumber(value, 0.42, 1.08);
+}
+
+function getMorphProfileRatio(profile: MorphShapeProfile, angle: number) {
+  if (profile === 'circle') return 1;
+  if (profile === 'triangle') return clampMorphRatio(getRegularPolygonRatio(3, angle, -Math.PI / 2));
+  if (profile === 'diamond') return clampMorphRatio(getRegularPolygonRatio(4, angle, 0));
+  if (profile === 'square') return clampMorphRatio(getRegularPolygonRatio(4, angle, Math.PI / 4));
+  if (profile === 'pentagon') return clampMorphRatio(getRegularPolygonRatio(5, angle, -Math.PI / 2));
+  if (profile === 'hexagon') return clampMorphRatio(getRegularPolygonRatio(6, angle, 0));
+  if (profile === 'octagon') return clampMorphRatio(getRegularPolygonRatio(8, angle, Math.PI / 8));
+  if (profile === 'star5') return clampMorphRatio(getStarRatio(5, angle, -Math.PI / 2, 0.48));
+  if (profile === 'star4') return clampMorphRatio(getStarRatio(4, angle, Math.PI / 4, 0.46));
+  if (profile === 'cross') {
+    const arm = Math.max(Math.abs(Math.cos(angle)), Math.abs(Math.sin(angle)));
+    return clampMorphRatio(0.52 + 0.48 * arm ** 10);
+  }
+
+  const square = getRegularPolygonRatio(4, angle, Math.PI / 4);
+  const octagon = getRegularPolygonRatio(8, angle, Math.PI / 8);
+  return clampMorphRatio(square * 0.45 + octagon * 0.55);
+}
+
+function getMorphFrame(progress: number, density: number): MorphShapeFrame {
+  const shapeCount = getMorphShapeCount(density);
+  const totalWeight = getMorphTotalWeight(shapeCount);
+  const target = wrapUnit(progress) * totalWeight;
+  let elapsedWeight = 0;
+  let index = 0;
+
+  for (let i = 0; i < shapeCount; i++) {
+    const weight = getMorphSegmentWeight(i);
+    if (target < elapsedWeight + weight) {
+      index = i;
+      break;
+    }
+    elapsedWeight += weight;
+  }
+
+  const segmentWeight = getMorphSegmentWeight(index);
+  const nextIndex = (index + 1) % shapeCount;
+  const local = clampNumber((target - elapsedWeight) / segmentWeight, 0, 1);
+  const holdRatio = getMorphHoldRatio(index);
+  const transition = clampNumber((local - holdRatio) / (1 - holdRatio), 0, 1);
+
+  return {
+    from: MORPH_SHAPE_SEQUENCE[index],
+    to: MORPH_SHAPE_SEQUENCE[nextIndex],
+    blend: easeMorphTransition(transition, index),
+    segmentIndex: index,
+    local,
+    shapeCount,
+  };
+}
+
+function getMorphShapeRatio(frame: MorphShapeFrame, angle: number) {
+  const from = getMorphProfileRatio(frame.from, angle);
+  const to = getMorphProfileRatio(frame.to, angle);
+
+  return from + (to - from) * frame.blend;
+}
+
+function getMorphShapePoint(radius: number, frame: MorphShapeFrame, angle: number, rotation: number) {
+  const ratio = getMorphShapeRatio(frame, angle);
+  const rotated = angle + rotation;
+
+  return {
+    x: Math.cos(rotated) * radius * ratio,
+    y: Math.sin(rotated) * radius * ratio,
+  };
+}
+
+function traceMorphShape(
+  ctx: CanvasRenderingContext2D,
+  radius: number,
+  frame: MorphShapeFrame,
+  rotation: number,
+  samples = 96,
+) {
+  for (let i = 0; i <= samples; i++) {
+    const angle = (i / samples) * Math.PI * 2;
+    const point = getMorphShapePoint(radius, frame, angle, rotation);
+
+    if (i === 0) {
+      ctx.moveTo(point.x, point.y);
+    } else {
+      ctx.lineTo(point.x, point.y);
+    }
+  }
+}
+
+function drawMorphShapes(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  shape: CropShape,
+  params: EffectParams,
+  progress: number,
+) {
+  const cx = width / 2;
+  const cy = height / 2;
+  const size = Math.min(width, height);
+  const radius = size / 2;
+  const phase = getDirectedProgress(params, progress);
+  const frame = getMorphFrame(phase, params.density);
+  const intensity = params.intensity / 100;
+  const ringWidth = 1.5 + (Math.max(1, Math.min(params.ringWidth, 100)) / 100) * 12;
+  const baseShapeRadius = radius * (0.46 + (Math.max(1, Math.min(params.ringWidth, 100)) / 100) * 0.2);
+  const mainRadius = baseShapeRadius * getMorphScale(frame);
+  const morphEnergy = Math.sin(frame.blend * Math.PI);
+  const rotation = getMorphRotation(frame);
+
+  ctx.save();
+  clipShapePath(ctx, shape, width, height);
+  ctx.clip();
+  ctx.translate(cx, cy);
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+
+  const fill = ctx.createLinearGradient(-mainRadius, -mainRadius, mainRadius, mainRadius);
+  fill.addColorStop(0, rgbaHexColor(params.color, 0.24 + intensity * 0.18));
+  fill.addColorStop(0.52, rgbaHexColor(params.secondaryColor, 0.16 + intensity * 0.14));
+  fill.addColorStop(1, rgbaHexColor(params.color, 0.08 + intensity * 0.1));
+
+  ctx.beginPath();
+  traceMorphShape(ctx, mainRadius * (1 + morphEnergy * 0.025), frame, rotation, 120);
+  ctx.closePath();
+  ctx.fillStyle = fill;
+  ctx.shadowColor = rgbaHexColor(params.color, 0.38 + intensity * 0.22);
+  ctx.shadowBlur = 16 + intensity * 24;
+  ctx.fill();
+  ctx.shadowBlur = 10 + intensity * 16;
+  ctx.strokeStyle = rgbaHexColor(params.color, 0.72 + intensity * 0.2);
+  ctx.lineWidth = Math.max(2, ringWidth * (0.72 + morphEnergy * 0.16));
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  ctx.restore();
+}
+
 type AxisRingLayer = 'back' | 'front';
 
 type AxisRingLayout = {
@@ -1543,6 +1774,11 @@ export function createRingRenderer({
 
       if (effect === 'kaleidoscope') {
         drawKaleidoscope(ctx, width, height, shape, params, progress);
+        return;
+      }
+
+      if (effect === 'morphshapes') {
+        drawMorphShapes(ctx, width, height, shape, params, progress);
         return;
       }
 

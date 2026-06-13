@@ -9,31 +9,31 @@ interface Props {
 
 const DIRECTION_EFFECTS = new Set<EffectType>([
   'solidring', 'disc', 'googleone', 'duotone', 'linxudo', 'collapsequad', 'axisrings',
-  'neoncomet', 'equalizer', 'magiccircle', 'cyberhud', 'portal', 'kaleidoscope',
+  'neoncomet', 'equalizer', 'magiccircle', 'cyberhud', 'portal', 'kaleidoscope', 'morphshapes',
 ]);
 const RING_EFFECTS = new Set<EffectType>(['solidring', 'disc', 'googleone', 'duotone', 'blinkring', 'linxudo', 'collapsequad']);
 const COLOR_EFFECTS = new Set<EffectType>([
   'lightning', 'fire', 'glow', 'orbit', 'shield', 'frost', 'ripple', 'petal', 'stardust',
   'vortex', 'firework', 'gold', 'spin', 'loader', 'spinner', 'matrix', 'bubble', 'aurora', 'firefly',
   'rain', 'duotone', 'blinkring', 'axisrings', 'neoncomet', 'equalizer',
-  'magiccircle', 'cyberhud', 'crtglitch', 'portal', 'kaleidoscope',
+  'magiccircle', 'cyberhud', 'crtglitch', 'portal', 'kaleidoscope', 'morphshapes',
 ]);
 const DENSITY_EFFECTS = new Set<EffectType>([
   'lightning', 'fire', 'glow', 'orbit', 'shield', 'frost', 'ripple', 'petal', 'stardust', 'prism',
   'vortex', 'firework', 'gold', 'spin', 'loader', 'matrix', 'bubble', 'aurora', 'firefly',
   'rain', 'duotone', 'neoncomet', 'equalizer', 'magiccircle', 'cyberhud', 'crtglitch',
-  'portal', 'kaleidoscope',
+  'portal', 'kaleidoscope', 'morphshapes',
 ]);
 const INTENSITY_EFFECTS = new Set<EffectType>([
   'lightning', 'fire', 'glow', 'orbit', 'shield', 'frost', 'ripple', 'petal', 'stardust', 'prism',
   'vortex', 'firework', 'gold', 'spin', 'loader', 'spinner', 'matrix', 'bubble', 'aurora', 'firefly',
   'rain', 'solidring', 'disc', 'googleone', 'duotone', 'blinkring', 'neoncomet', 'equalizer',
-  'magiccircle', 'cyberhud', 'crtglitch', 'portal', 'kaleidoscope',
+  'magiccircle', 'cyberhud', 'crtglitch', 'portal', 'kaleidoscope', 'morphshapes',
 ]);
 const SIZE_EFFECTS = new Set<EffectType>(['bounce']);
 const COUNT_EFFECTS = new Set<EffectType>(['bounce']);
 const RING_WIDTH_EFFECTS = new Set<EffectType>([
-  'collapsequad', 'axisrings', 'neoncomet', 'equalizer', 'magiccircle', 'cyberhud', 'portal',
+  'collapsequad', 'axisrings', 'neoncomet', 'equalizer', 'magiccircle', 'cyberhud', 'portal', 'morphshapes',
 ]);
 
 const EffectControls: React.FC<Props> = ({ effect, params, onChange }) => {

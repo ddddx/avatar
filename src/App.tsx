@@ -24,7 +24,7 @@ import './App.css';
 const supportsMediaRecorder = typeof MediaRecorder !== 'undefined';
 const supportsWebWorkers = typeof Worker !== 'undefined';
 const GIF_TRANSPARENT_KEY = 0xff00ff;
-const RING_EFFECTS = new Set<EffectType>(['solidring', 'disc', 'googleone', 'duotone', 'blinkring', 'linxudo', 'bounce', 'collapsequad', 'axisrings', 'loader', 'spinner', 'neoncomet', 'equalizer', 'magiccircle', 'cyberhud', 'crtglitch', 'portal', 'kaleidoscope']);
+const RING_EFFECTS = new Set<EffectType>(['solidring', 'disc', 'googleone', 'duotone', 'blinkring', 'linxudo', 'bounce', 'collapsequad', 'axisrings', 'loader', 'spinner', 'neoncomet', 'equalizer', 'magiccircle', 'cyberhud', 'crtglitch', 'portal', 'kaleidoscope', 'morphshapes']);
 const PREVIEW_LOOP_EFFECTS = new Set<EffectType>(['fire', 'aurora', 'rain']);
 const TRANSPARENT_STAGE_EFFECTS = new Set<EffectType>(['bounce']);
 const EFFECT_LABELS: Record<EffectType, string> = {
@@ -44,6 +44,7 @@ const EFFECT_LABELS: Record<EffectType, string> = {
   crtglitch: 'CRT 故障',
   portal: '传送门',
   kaleidoscope: '万花筒',
+  morphshapes: '多形变换',
   lightning: '闪电',
   fire: '火焰',
   glow: '炫光',
